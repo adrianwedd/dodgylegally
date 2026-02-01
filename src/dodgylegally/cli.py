@@ -136,8 +136,9 @@ def download(ctx, phrase, phrases_file, url, delay, dry_run, source):
 @cli.command()
 @click.option("--input", "-i", "input_path", default=None, help="Input file or directory. Defaults to <output>/raw/.")
 @click.option("--effects", "-e", default=None, help="Effect chain (e.g. 'reverb:0.5,lowpass:3000,bitcrush:8').")
+@click.option("--target-bpm", default=None, type=float, help="Target BPM for beat-aligned loops.")
 @click.pass_context
-def process(ctx, input_path, effects):
+def process(ctx, input_path, effects, target_bpm):
     """Process audio files into one-shots and loops."""
     import glob
     import os
