@@ -26,4 +26,6 @@ def list_sources() -> list[str]:
 
 # Register built-in sources
 from dodgylegally.sources.youtube import YouTubeSource  # noqa: E402
+from dodgylegally.sources.local import LocalSource  # noqa: E402
 register_source("youtube", YouTubeSource)
+register_source("local", LocalSource)
