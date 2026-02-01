@@ -120,3 +120,57 @@ def test_local_source_search_filters_by_query(tmp_path):
     assert "rain_001.wav" in names
     assert "rain_002.wav" in names
     assert "thunder_001.wav" not in names
+
+
+def test_local_source_download_with_clip_spec(tmp_path):
+    """download uses clip_spec for duration and position."""
+    from dodgylegally.sources.local import LocalSource
+    from dodgylegally.sources.base import SearchResult
+    from dodgylegally.clip import ClipSpec, ClipPosition
+
+    source_file = _make_wav(tmp_path / "source" / "long.wav", duration_ms=5000)
+    output_dir = tmp_path / "output"
+
+    spec = ClipSpec(position=ClipPosition.MIDPOINT, duration_s=2.0)
+    source = LocalSource(base_path=tmp_path / "source")
+    result = SearchResult("local", "long.wav", str(source_file), 5.0, {})
+    clip = source.download(result, output_dir, clip_spec=spec)
+
+    assert clip.path.exists()
+    assert clip.duration_ms == 2000
+    assert clip.clip_spec is spec
+
+
+def test_local_source_download_with_timestamp(tmp_path):
+    """download with TIMESTAMP position extracts from the specified position."""
+    from dodgylegally.sources.local import LocalSource
+    from dodgylegally.sources.base import SearchResult
+    from dodgylegally.clip import ClipSpec, ClipPosition
+
+    source_file = _make_wav(tmp_path / "source" / "long.wav", duration_ms=5000)
+    output_dir = tmp_path / "output"
+
+    spec = ClipSpec(position=ClipPosition.TIMESTAMP, timestamp_s=1.0, duration_s=1.5)
+    source = LocalSource(base_path=tmp_path / "source")
+    result = SearchResult("local", "long.wav", str(source_file), 5.0, {})
+    clip = source.download(result, output_dir, clip_spec=spec)
+
+    assert clip.path.exists()
+    assert clip.duration_ms == 1500
+
+
+def test_local_source_download_default_is_random(tmp_path):
+    """download without clip_spec defaults to random position."""
+    from dodgylegally.sources.local import LocalSource
+    from dodgylegally.sources.base import SearchResult
+    from dodgylegally.clip import ClipPosition
+
+    source_file = _make_wav(tmp_path / "source" / "long.wav", duration_ms=5000)
+    output_dir = tmp_path / "output"
+
+    source = LocalSource(base_path=tmp_path / "source")
+    result = SearchResult("local", "long.wav", str(source_file), 5.0, {})
+    clip = source.download(result, output_dir)
+
+    assert clip.clip_spec.position is ClipPosition.RANDOM
+    assert clip.duration_ms == 1000

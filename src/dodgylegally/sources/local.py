@@ -7,6 +7,7 @@ from pathlib import Path
 
 from pydub import AudioSegment
 
+from dodgylegally.clip import ClipPosition, ClipSpec
 from dodgylegally.sources.base import DownloadedClip, SearchResult
 
 _SUPPORTED_EXTENSIONS = {".wav", ".mp3", ".flac", ".ogg", ".aif", ".aiff"}
@@ -55,24 +56,29 @@ class LocalSource:
         self,
         result: SearchResult,
         output_dir: Path,
+        clip_spec: ClipSpec | None = None,
         **kwargs,
     ) -> DownloadedClip:
-        """Extract a 1-second clip from a random position in the source file.
+        """Extract a clip from a local audio file.
 
-        For files shorter than 1 second, returns the full audio.
+        Uses clip_spec for position and duration. Defaults to random position,
+        1 second duration (preserving original behavior).
         """
+        spec = clip_spec or ClipSpec(position=ClipPosition.RANDOM, duration_s=1.0)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         audio = AudioSegment.from_file(result.url)
         duration_ms = len(audio)
+        clip_duration_ms = int(spec.duration_s * 1000)
 
-        if duration_ms <= 1000:
+        if duration_ms <= clip_duration_ms:
             clip = audio
         else:
-            max_start = duration_ms - 1000
-            start = random.randint(0, max_start)
-            clip = audio[start:start + 1000]
+            start_s = spec.compute_start_time(duration_ms / 1000.0)
+            start_ms = int(start_s * 1000)
+            start_ms = max(0, min(start_ms, duration_ms - clip_duration_ms))
+            clip = audio[start_ms:start_ms + clip_duration_ms]
 
         out_name = Path(result.title).stem + "_clip.wav"
         out_path = output_dir / out_name
@@ -82,6 +88,7 @@ class LocalSource:
             path=out_path,
             source_result=result,
             duration_ms=len(clip),
+            clip_spec=spec,
         )
 
     def dry_run(self, query: str) -> dict:

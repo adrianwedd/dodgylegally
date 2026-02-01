@@ -57,13 +57,13 @@ def test_download_audio_returns_new_files(mock_ydl_class, tmp_path):
 
 
 def test_download_range_func_end_time():
-    """Verify that _DownloadRangeFunc sets end_time = start_time + 1."""
-    from dodgylegally.download import _DownloadRangeFunc
-    func = _DownloadRangeFunc()
+    """Verify that DownloadRangeFunc sets correct start/end times."""
+    from dodgylegally.clip import DownloadRangeFunc
+    func = DownloadRangeFunc()
     result = list(func({"duration": 100}, None))
     assert len(result) == 1
-    assert result[0]["start_time"] == 50
-    assert result[0]["end_time"] == 51
+    assert result[0]["start_time"] == 49.5
+    assert result[0]["end_time"] == 50.5
 
 
 def test_make_download_options_empty_phrase_fallback():
@@ -74,8 +74,29 @@ def test_make_download_options_empty_phrase_fallback():
 
 def test_download_range_func_no_duration():
     """Verify fallback when duration is None."""
-    from dodgylegally.download import _DownloadRangeFunc
-    func = _DownloadRangeFunc()
+    from dodgylegally.clip import DownloadRangeFunc
+    func = DownloadRangeFunc()
     result = list(func({"duration": None}, None))
     assert result[0]["start_time"] == 0
-    assert result[0]["end_time"] == 1
+    assert result[0]["end_time"] == 1.0
+
+
+def test_make_download_options_with_clip_spec():
+    """make_download_options uses provided ClipSpec."""
+    from dodgylegally.clip import ClipSpec, ClipPosition, DownloadRangeFunc
+    spec = ClipSpec(position=ClipPosition.MIDPOINT, duration_s=2.5)
+    opts = make_download_options("test", "/tmp/out", clip_spec=spec)
+    range_func = opts["download_ranges"]
+    assert isinstance(range_func, DownloadRangeFunc)
+    result = list(range_func({"duration": 100}, None))
+    assert result[0]["end_time"] - result[0]["start_time"] == 2.5
+
+
+def test_make_download_options_default_clip_spec():
+    """make_download_options uses default spec when none provided."""
+    from dodgylegally.clip import DownloadRangeFunc
+    opts = make_download_options("test", "/tmp/out")
+    range_func = opts["download_ranges"]
+    assert isinstance(range_func, DownloadRangeFunc)
+    result = list(range_func({"duration": 60}, None))
+    assert result[0]["end_time"] - result[0]["start_time"] == 1.0

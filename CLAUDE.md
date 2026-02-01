@@ -14,7 +14,7 @@ Based on work by Colugo Music; public domain, no license.
 # Install (dev mode)
 pip install -e .
 
-# Run tests (101 tests)
+# Run tests (222 tests)
 pytest tests/ -v
 
 # CLI usage
@@ -22,11 +22,14 @@ dodgylegally --help
 dodgylegally search --count 5
 dodgylegally download --phrase "rain thunder" --source youtube
 dodgylegally download --phrase "ambient pad" --source local
+dodgylegally download --phrase "rain" --clip-position random --clip-duration 2.0
+dodgylegally download --phrase "rain" --clip-position 15.0 --clip-duration 3.0
 dodgylegally process
 dodgylegally combine
 dodgylegally run --count 10 -o ./my_samples
 dodgylegally run --count 20 --preset ambient --dry-run
 dodgylegally run --count 10 --source youtube:7 --source local:3
+dodgylegally run --count 5 --clip-position random --clip-duration 2.0
 ```
 
 Requires FFmpeg installed for audio processing (`brew install ffmpeg` on macOS).
@@ -36,21 +39,35 @@ Requires FFmpeg installed for audio processing (`brew install ffmpeg` on macOS).
 ```
 src/dodgylegally/
 ├── cli.py              # Click CLI entry point with subcommands
+├── clip.py             # ClipSpec, ClipPosition, DownloadRangeFunc — clip extraction config
 ├── search.py           # Word list loading and random phrase generation
 ├── download.py         # Legacy yt-dlp wrapper (download_url for direct URLs)
 ├── process.py          # One-shot and loop audio processing (pydub)
 ├── combine.py          # Versioned loop merging
 ├── config.py           # YAML preset loading and merging
 ├── metadata.py         # JSON sidecar read/write/merge for sample provenance
+├── analyze.py          # Audio analysis — BPM, key, loudness, spectral features
+├── looping.py          # BPM-aware loop creation, beat alignment, zero-crossing
+├── transform.py        # Pitch shifting, time stretching, key matching
+├── stems.py            # Stem export alongside full mix
 ├── ui.py               # Console output wrapper (quiet/verbose/debug modes)
 ├── logging_config.py   # Python logging configuration
 ├── wordlist.txt        # Bundled 5000-word list
 ├── presets/            # Bundled YAML presets (default, ambient, percussive, chaotic)
-└── sources/            # Pluggable audio source system
-    ├── __init__.py     # Source registry (get_source, list_sources, weighted_select)
-    ├── base.py         # AudioSource protocol, SearchResult, DownloadedClip
-    ├── youtube.py      # YouTubeSource — yt-dlp with retry and backoff
-    └── local.py        # LocalSource — sample from local audio files
+├── effects/            # Pluggable audio effect system
+│   ├── __init__.py     # Effect registry, parse_chain
+│   ├── base.py         # AudioEffect protocol
+│   └── builtin.py      # reverb, lowpass, highpass, bitcrush, distortion, stutter, reverse
+├── sources/            # Pluggable audio source system
+│   ├── __init__.py     # Source registry (get_source, list_sources, weighted_select)
+│   ├── base.py         # AudioSource protocol, SearchResult, DownloadedClip
+│   ├── youtube.py      # YouTubeSource — yt-dlp with retry and backoff
+│   └── local.py        # LocalSource — sample from local audio files
+└── strategies/         # Arrangement and composition strategies
+    ├── __init__.py     # Strategy registry
+    ├── base.py         # ArrangementStrategy protocol
+    ├── builtin.py      # sequential, loudness, tempo, key_compatible, layered
+    └── templates.py    # YAML arrangement templates (build-and-drop, ambient-drift)
 ```
 
 **Pipeline:** search → download → process → combine
@@ -65,14 +82,16 @@ Each module exposes plain Python functions. The CLI is a thin arg-parsing layer.
 - **Sidecar metadata** — `.json` companion files alongside every `.wav` tracking source, query, timestamps.
 - **Preset system** — YAML presets in bundled dir or `~/.config/dodgylegally/presets/`. CLI flags override.
 - **Mutually exclusive options** — `--verbose` and `--quiet` enforced via custom `_MutuallyExclusiveOption`.
+- **Configurable clip extraction** — `ClipSpec` dataclass controls position (midpoint/random/timestamp) and duration; shared by all sources and the legacy download module.
 
 ### Subcommands
 
 - **search** — Generates random 2-word phrases from bundled or custom word list, outputs to stdout
-- **download** — Downloads audio clips via pluggable sources (`--source youtube|local`). Supports `--delay`, `--dry-run`, `--url` for direct downloads.
-- **process** — Creates one-shot (capped 2000ms, fade-out) and loop (cross-fade, overlay) variants
-- **combine** — Concatenates loops (repeated N times per `--repeats`) into versioned combined file
-- **run** — Full pipeline end-to-end. Supports `--preset`, `--source` (repeatable with weights), `--delay`, `--dry-run`.
+- **download** — Downloads audio clips via pluggable sources (`--source youtube|local`). Supports `--delay`, `--dry-run`, `--url` for direct downloads, `--clip-position` (midpoint/random/timestamp), `--clip-duration`.
+- **process** — Creates one-shot (capped 2000ms, fade-out) and loop (cross-fade, overlay) variants. Supports `--effects`, `--target-bpm`, `--stretch`, `--pitch`, `--target-key`.
+- **combine** — Concatenates loops (repeated N times per `--repeats`) into versioned combined file. Supports `--strategy`, `--template`, `--stems`.
+- **analyze** — BPM, key, loudness, and spectral analysis of audio files. Supports `--no-cache`.
+- **run** — Full pipeline end-to-end. Supports `--preset`, `--source` (repeatable with weights), `--delay`, `--dry-run`, `--clip-position`, `--clip-duration`.
 
 Subcommands compose via piping: `dodgylegally search --count 5 | dodgylegally download --phrases-file -`
 
@@ -90,7 +109,8 @@ Subcommands compose via piping: `dodgylegally search --count 5 | dodgylegally do
 ├── raw/          # Downloaded audio clips + JSON metadata sidecars
 ├── oneshot/      # One-shot processed samples
 ├── loop/         # Loop processed samples
-└── combined/     # Combined loop files (versioned)
+├── combined/     # Combined loop files (versioned)
+└── stems/        # Individual stem files + manifest (when --stems used)
 ```
 
 ## Dependencies
@@ -103,7 +123,7 @@ Subcommands compose via piping: `dodgylegally search --count 5 | dodgylegally do
 
 ## Testing
 
-101 tests across 14 test files covering CLI subcommands, source abstraction, local file source, metadata sidecars, weighted selection, download resilience, presets, logging, UI modes, and audio processing.
+222 tests across 22 test files covering CLI subcommands, clip extraction, source abstraction, local file source, metadata sidecars, weighted selection, download resilience, presets, logging, UI modes, audio processing, effects, BPM looping, transforms, strategies, templates, stems, and analysis.
 
 ```bash
 pytest tests/ -v
@@ -111,11 +131,11 @@ pytest tests/ -v
 
 ## Roadmap
 
-Active development across 4 phases. Design docs in `docs/plans/`:
+All 4 phases complete. Design docs in `docs/plans/`:
 - **Phase 1** (complete): Workflow & UX — progress, resilience, presets, logging
 - **Phase 2** (complete): Source Diversity — source abstraction, local files, metadata, weighted runs
-- **Phase 3** (next): Audio Creativity — analysis, effects, BPM-aware looping, pitch/time transforms
-- **Phase 4** (planned): Composition Intelligence — arrangement strategies, templates, stem export
+- **Phase 3** (complete): Audio Creativity — analysis, effects, BPM-aware looping, pitch/time transforms
+- **Phase 4** (complete): Composition Intelligence — arrangement strategies, templates, stem export
 
 ## Legacy
 

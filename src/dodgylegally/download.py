@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import glob
 import os
 import time
 
 from yt_dlp import YoutubeDL
+
+from dodgylegally.clip import ClipSpec, DownloadRangeFunc, DEFAULT_CLIP_SPEC
 
 
 class DownloadSkipError(Exception):
@@ -24,17 +28,13 @@ def _is_skip_error(error: Exception) -> bool:
     return any(pattern in msg for pattern in _SKIP_PATTERNS)
 
 
-class _DownloadRangeFunc:
-    """Extract 1-second segment from video midpoint."""
-
-    def __call__(self, info_dict, ydl):
-        duration = info_dict.get("duration")
-        timestamp = (duration / 2) if duration else 0
-        yield {"start_time": timestamp, "end_time": timestamp + 1}
-
-
-def make_download_options(phrase: str, output_dir: str) -> dict:
+def make_download_options(
+    phrase: str,
+    output_dir: str,
+    clip_spec: ClipSpec | None = None,
+) -> dict:
     """Build yt-dlp options dict."""
+    spec = clip_spec or DEFAULT_CLIP_SPEC
     safe_phrase = "".join(x for x in phrase if x.isalnum() or x in "._- ").strip()
     if not safe_phrase:
         safe_phrase = "download"
@@ -42,7 +42,7 @@ def make_download_options(phrase: str, output_dir: str) -> dict:
         "format": "bestaudio/best",
         "paths": {"home": output_dir},
         "outtmpl": {"default": f"{safe_phrase}-%(id)s.%(ext)s"},
-        "download_ranges": _DownloadRangeFunc(),
+        "download_ranges": DownloadRangeFunc(spec=spec),
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
         "quiet": True,
         "no_warnings": True,
@@ -61,8 +61,9 @@ def download_audio(
     max_retries: int = 3,
     delay: float = 0,
     dry_run: bool = False,
+    clip_spec: ClipSpec | None = None,
 ) -> list[str]:
-    """Download 1s audio clip from YouTube search for phrase.
+    """Download audio clip from YouTube search for phrase.
 
     Returns list of downloaded file paths.
     Retries transient errors up to max_retries with exponential backoff.
@@ -75,7 +76,7 @@ def download_audio(
     os.makedirs(output_dir, exist_ok=True)
     before = set(glob.glob(os.path.join(output_dir, "*.wav")))
     url = f'ytsearch1:"{phrase}"'
-    opts = make_download_options(phrase, output_dir)
+    opts = make_download_options(phrase, output_dir, clip_spec=clip_spec)
 
     last_error = None
     for attempt in range(max_retries):
@@ -94,11 +95,15 @@ def download_audio(
     raise last_error
 
 
-def download_url(url: str, output_dir: str) -> list[str]:
-    """Download 1s audio clip from a specific YouTube URL. Returns list of downloaded file paths."""
+def download_url(
+    url: str,
+    output_dir: str,
+    clip_spec: ClipSpec | None = None,
+) -> list[str]:
+    """Download audio clip from a specific YouTube URL. Returns list of downloaded file paths."""
     os.makedirs(output_dir, exist_ok=True)
     before = set(glob.glob(os.path.join(output_dir, "*.wav")))
-    opts = make_download_options("url_download", output_dir)
+    opts = make_download_options("url_download", output_dir, clip_spec=clip_spec)
     with YoutubeDL(opts) as ydl:
         ydl.download([url])
     return _find_new_files(output_dir, before)

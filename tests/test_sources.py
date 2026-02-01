@@ -124,6 +124,55 @@ def test_youtube_source_dry_run():
     assert "ytsearch" in info["url"]
 
 
+@patch("dodgylegally.sources.youtube.YoutubeDL")
+def test_youtube_source_download_with_clip_spec(mock_ydl_class, tmp_path):
+    """YouTubeSource.download passes clip_spec to DownloadRangeFunc."""
+    from dodgylegally.sources.base import SearchResult
+    from dodgylegally.sources.youtube import YouTubeSource
+    from dodgylegally.clip import ClipSpec, ClipPosition
+    from pydub.generators import WhiteNoise
+
+    def fake_download(urls):
+        wav = tmp_path / "test-abc.wav"
+        WhiteNoise().to_audio_segment(duration=2000).export(str(wav), format="wav")
+
+    mock_ydl = MagicMock()
+    mock_ydl.download.side_effect = fake_download
+    mock_ydl_class.return_value.__enter__ = MagicMock(return_value=mock_ydl)
+    mock_ydl_class.return_value.__exit__ = MagicMock(return_value=False)
+
+    spec = ClipSpec(position=ClipPosition.RANDOM, duration_s=2.0)
+    source = YouTubeSource()
+    result = SearchResult("youtube", "Test", "https://youtube.com/watch?v=abc", 60.0, {})
+    clip = source.download(result, tmp_path, clip_spec=spec)
+    assert clip.duration_ms == 2000
+    assert clip.clip_spec is spec
+
+
+@patch("dodgylegally.sources.youtube.YoutubeDL")
+def test_youtube_source_download_default_clip_spec(mock_ydl_class, tmp_path):
+    """YouTubeSource.download defaults to midpoint 1s when no clip_spec."""
+    from dodgylegally.sources.base import SearchResult
+    from dodgylegally.sources.youtube import YouTubeSource
+    from dodgylegally.clip import ClipPosition
+    from pydub.generators import WhiteNoise
+
+    def fake_download(urls):
+        wav = tmp_path / "test-abc.wav"
+        WhiteNoise().to_audio_segment(duration=1000).export(str(wav), format="wav")
+
+    mock_ydl = MagicMock()
+    mock_ydl.download.side_effect = fake_download
+    mock_ydl_class.return_value.__enter__ = MagicMock(return_value=mock_ydl)
+    mock_ydl_class.return_value.__exit__ = MagicMock(return_value=False)
+
+    source = YouTubeSource()
+    result = SearchResult("youtube", "Test", "https://youtube.com/watch?v=abc", 60.0, {})
+    clip = source.download(result, tmp_path)
+    assert clip.duration_ms == 1000
+    assert clip.clip_spec.position is ClipPosition.MIDPOINT
+
+
 def test_cli_download_accepts_source_flag():
     """CLI download subcommand accepts --source flag."""
     from click.testing import CliRunner

@@ -72,6 +72,45 @@ def test_generate_phrases_too_few_words():
         generate_phrases([], 5)
 
 
+def test_download_accepts_clip_position_flag():
+    """CLI download subcommand accepts --clip-position flag."""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["download", "--clip-position", "random", "--dry-run", "--phrase", "test"])
+    assert result.exit_code == 0
+
+
+def test_download_accepts_clip_duration_flag():
+    """CLI download subcommand accepts --clip-duration flag."""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["download", "--clip-duration", "2.5", "--dry-run", "--phrase", "test"])
+    assert result.exit_code == 0
+
+
+def test_download_accepts_timestamp_position():
+    """CLI download subcommand accepts a numeric --clip-position."""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["download", "--clip-position", "30.5", "--dry-run", "--phrase", "test"])
+    assert result.exit_code == 0
+
+
+def test_download_rejects_invalid_clip_position():
+    """CLI download subcommand rejects invalid --clip-position values."""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["download", "--clip-position", "bogus", "--dry-run", "--phrase", "test"])
+    assert result.exit_code != 0
+
+
+def test_run_accepts_clip_flags(tmp_path):
+    """run subcommand accepts --clip-position and --clip-duration flags."""
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "-o", str(tmp_path),
+        "run", "--count", "1", "--dry-run",
+        "--clip-position", "random", "--clip-duration", "2.0",
+    ])
+    assert result.exit_code == 0
+
+
 def test_run_passes_repeats_to_combine(tmp_path):
     """run subcommand passes parsed --repeats value to combine_loops."""
     from unittest.mock import patch, MagicMock

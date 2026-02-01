@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from dodgylegally.clip import ClipSpec
 
 
 @dataclass
@@ -25,6 +28,7 @@ class DownloadedClip:
     path: Path
     source_result: SearchResult
     duration_ms: int
+    clip_spec: ClipSpec | None = None
 
 
 @runtime_checkable
