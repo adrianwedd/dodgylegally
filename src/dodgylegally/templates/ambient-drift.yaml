@@ -1,0 +1,14 @@
+name: ambient-drift
+description: Slow harmonic wandering. Key-compatible ordering with long repeats.
+sections:
+  - name: opening
+    strategy: key_compatible
+    duration_s: 12
+  - name: middle
+    strategy: loudness
+    duration_s: 10
+    kwargs:
+      descending: false
+  - name: close
+    strategy: key_compatible
+    duration_s: 10
