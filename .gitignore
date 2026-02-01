@@ -7,6 +7,7 @@ __pycache__/
 dist/
 build/
 *.whl
+.eggs/
 
 # Virtual environments
 .venv/
@@ -23,6 +24,9 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
 
 # Audio output (large binary files)
 case_study_output/
@@ -41,3 +45,6 @@ dodgylegally_output/
 # Environment
 .env
 .env.local
+
+# User config / presets
+~/.config/dodgylegally/

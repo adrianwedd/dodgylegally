@@ -4,22 +4,22 @@ You type a number. The machine picks two words at random — *spinelet digeny*, 
 
 Do it ten times and you have a sample pack. Do it a hundred times and you have an instrument.
 
-**dodgylegally** is a CLI tool for generating audio samples from the chaos of YouTube. It searches, downloads, processes, and combines — turning random words into one-shots, loops, and compositions.
+**dodgylegally** is a CLI tool for generating audio samples from the chaos of YouTube — and beyond. It searches, downloads, processes, and combines, turning random words into one-shots, loops, and compositions. Pull from YouTube, sample your own library, mix sources with weighted randomness, and track every sample back to its origin.
 
 ---
 
 ## How it works
 
 ```
-words ──→ phrases ──→ YouTube ──→ audio ──→ samples
+words ──→ phrases ──→ sources ──→ audio ──→ samples
 ```
 
 1. **Search** — Pairs random words from a 5,000-word dictionary into phrases no human would type.
-2. **Download** — Searches YouTube for each phrase. Extracts a 1-second clip from the midpoint of the first result.
+2. **Download** — Searches audio sources for each phrase. Extracts a short clip from each result. Retries on failure, backs off on rate limits.
 3. **Process** — Shapes each clip into two variants: a **one-shot** (2s max, normalized, fade-out) and a **loop** (1s, cross-faded for seamless repeat).
 4. **Combine** — Stitches all loops together, each repeated 3-4 times, into a single versioned file.
 
-Every run produces different output. Two people running the same command will get completely different audio.
+Every run produces different output. Two people running the same command will get completely different audio. Every sample gets a JSON sidecar tracking where it came from.
 
 ## Quick start
 
@@ -48,7 +48,7 @@ sudo apt install ffmpeg
 ### The full pipeline
 
 ```bash
-# 10 random samples
+# 10 random samples from YouTube
 dodgylegally run --count 10
 
 # Custom output directory
@@ -56,6 +56,24 @@ dodgylegally run --count 5 -o ~/Music/samples
 
 # Use a themed word list
 dodgylegally run --count 20 --wordlist weather_words.txt
+
+# Use a preset
+dodgylegally run --count 20 --preset ambient
+
+# Mix sources: ~70% YouTube, ~30% local files
+dodgylegally run --count 10 --source youtube:7 --source local:3
+
+# Preview what would happen without downloading
+dodgylegally run --count 10 --dry-run
+
+# Verbose output for debugging
+dodgylegally run --count 5 -v
+
+# Quiet mode — errors only
+dodgylegally run --count 50 -q
+
+# Log everything to a file
+dodgylegally run --count 50 --log-file run.log
 ```
 
 ### Step by step
@@ -75,8 +93,14 @@ dodgylegally search --count 5
 dodgylegally download --phrase "rain thunder"
 dodgylegally download --phrase "ocean waves" --phrase "wind chimes"
 
-# Download from a direct URL
+# Download from a direct YouTube URL
 dodgylegally download --url "https://youtube.com/watch?v=..."
+
+# Download with rate limit protection
+dodgylegally download --phrase "wind" --delay 2.0
+
+# Download from local audio files instead of YouTube
+dodgylegally download --phrase "ambient" --source local
 
 # Process raw downloads into one-shots and loops
 dodgylegally process
@@ -98,6 +122,23 @@ dodgylegally process
 dodgylegally combine
 ```
 
+### Presets
+
+Bundled presets for common workflows:
+
+| Preset | Count | Delay | Repeats | Character |
+|--------|-------|-------|---------|-----------|
+| `default` | 10 | 0s | 3-4 | Balanced starting point |
+| `ambient` | 20 | 3s | 4-6 | Slow, patient, textural |
+| `percussive` | 15 | 2s | 2-3 | Punchy, rhythmic |
+| `chaotic` | 50 | 1s | 1-2 | Fast, dense, unpredictable |
+
+```bash
+dodgylegally run --count 20 --preset ambient
+```
+
+Custom presets go in `~/.config/dodgylegally/presets/` as YAML files. CLI flags override preset values.
+
 ### Custom word lists
 
 The built-in dictionary has 5,000 words. For themed collections, supply your own:
@@ -109,17 +150,33 @@ dodgylegally run --count 10 --wordlist weather.txt
 
 The phrases will still be random pairs (*thunder drizzle*, *hail storm*), but the source material will skew toward weather-related videos.
 
+### Audio sources
+
+dodgylegally has a pluggable source system. Each source implements the same protocol — search, download, done.
+
+| Source | Description |
+|--------|-------------|
+| `youtube` (default) | Searches YouTube via yt-dlp. Extracts a 1-second clip from the video midpoint. |
+| `local` | Scans a local directory for audio files (WAV, MP3, FLAC, OGG, AIFF). Extracts a 1-second clip from a random position. |
+
+Sources can be weighted for mixed runs:
+
+```bash
+# ~70% YouTube, ~30% local
+dodgylegally run --count 10 --source youtube:7 --source local:3
+```
+
 ## Output
 
 ```
 dodgylegally_output/
-├── raw/          Downloaded clips (1-10s each)
+├── raw/          Downloaded clips + JSON metadata sidecars
 ├── oneshot/      One-shot samples (2s, normalized, fade-out)
 ├── loop/         Loop samples (1s, cross-faded, seamless)
 └── combined/     Combined loops (versioned: v1, v2, ...)
 ```
 
-All output is standard WAV. Load into any DAW, sampler, or audio tool.
+All output is standard WAV. Each clip has a `.json` sidecar tracking its source, query, URL, timestamps, and processing history.
 
 ## What you can do with it
 
@@ -141,15 +198,24 @@ Two documented experiments exploring different approaches:
 
 ```
 src/dodgylegally/
-├── cli.py          Click CLI with subcommands
-├── search.py       Word list loading, phrase generation
-├── download.py     yt-dlp wrapper, midpoint extraction
-├── process.py      One-shot and loop processing (pydub)
-├── combine.py      Versioned loop merging
-└── wordlist.txt    Bundled 5,000-word dictionary
+├── cli.py              Click CLI with subcommands
+├── search.py           Word list loading, phrase generation
+├── download.py         Direct URL download (yt-dlp)
+├── process.py          One-shot and loop processing (pydub)
+├── combine.py          Versioned loop merging
+├── config.py           YAML preset loading and merging
+├── metadata.py         JSON sidecar system for provenance
+├── ui.py               Console output (quiet/verbose modes)
+├── logging_config.py   Structured logging configuration
+├── wordlist.txt        Bundled 5,000-word dictionary
+├── presets/            Bundled YAML presets
+└── sources/            Pluggable audio source system
+    ├── base.py         AudioSource protocol, SearchResult, DownloadedClip
+    ├── youtube.py      YouTube source (yt-dlp with retry/backoff)
+    └── local.py        Local file source (random position extraction)
 ```
 
-Each module exposes plain Python functions. The CLI is a thin layer on top. All inter-step communication happens through the filesystem.
+Each module exposes plain Python functions. The CLI is a thin layer on top. All inter-step communication happens through the filesystem. Sources are protocol-based — implement `search()`, `download()`, and `dry_run()` to add a new one.
 
 ## Development
 
@@ -161,7 +227,7 @@ pip install -e .
 pytest tests/ -v
 ```
 
-30 tests covering CLI subcommands, download options, audio processing, loop combining, phrase generation, and input validation.
+101 tests covering CLI subcommands, source abstraction, local file sampling, metadata sidecars, weighted selection, download resilience, preset configuration, structured logging, UI modes, and audio processing.
 
 ## Origins
 
