@@ -169,3 +169,35 @@ def test_cli_process_accepts_transform_flags():
     assert "--stretch" in result.output
     assert "--pitch" in result.output
     assert "--target-key" in result.output
+
+
+def test_cli_process_transform_cleans_temps_on_error(tmp_path):
+    """Transform temp files are cleaned up even when process_file raises."""
+    import os
+    import tempfile
+    from unittest.mock import patch
+    from click.testing import CliRunner
+    from dodgylegally.cli import cli
+
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    _make_sine_wav(raw_dir / "test.wav", duration_s=2.0)
+
+    temp_dir = tempfile.gettempdir()
+    before = {f for f in os.listdir(temp_dir) if f.endswith(".wav")}
+
+    with patch("dodgylegally.transform.time_stretch_file") as mock_stretch:
+        # Make stretch write a real temp file, then process_file will fail
+        mock_stretch.side_effect = lambda inp, out, rate: (
+            sf.write(out, np.zeros(22050), 22050) or out
+        )
+        with patch("dodgylegally.process.process_file", side_effect=RuntimeError("boom")):
+            runner = CliRunner()
+            result = runner.invoke(cli, [
+                "--output", str(tmp_path),
+                "process", "--stretch", "2.0",
+            ])
+
+    after = {f for f in os.listdir(temp_dir) if f.endswith(".wav")}
+    leaked = after - before
+    assert len(leaked) == 0, f"Leaked temp files: {leaked}"

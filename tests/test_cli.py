@@ -70,3 +70,42 @@ def test_generate_phrases_too_few_words():
         generate_phrases(["only_one"], 5)
     with pytest.raises(ValueError, match="at least 2 words"):
         generate_phrases([], 5)
+
+
+def test_run_passes_repeats_to_combine(tmp_path):
+    """run subcommand passes parsed --repeats value to combine_loops."""
+    from unittest.mock import patch, MagicMock
+    import numpy as np
+    import soundfile as sf
+
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    # Create a test wav so process_file has something to work with
+    t = np.linspace(0, 0.5, 11025, endpoint=False)
+    audio = 0.5 * np.sin(2 * np.pi * 440 * t)
+    sf.write(str(raw_dir / "test.wav"), audio, 22050)
+
+    with patch("dodgylegally.combine.combine_loops") as mock_combine, \
+         patch("dodgylegally.sources.get_source") as mock_get_source:
+        # Set up mock source that returns a clip
+        mock_source = MagicMock()
+        mock_source.name = "youtube"
+        mock_source.search.return_value = [MagicMock()]
+        mock_clip = MagicMock()
+        mock_clip.path = raw_dir / "test.wav"
+        mock_source.download.return_value = mock_clip
+        mock_get_source.return_value = mock_source
+
+        mock_combine.return_value = None
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "-o", str(tmp_path),
+            "run", "--count", "1", "--repeats", "5-6",
+        ])
+        assert result.exit_code == 0, result.output
+        mock_combine.assert_called_once()
+        call_kwargs = mock_combine.call_args
+        # repeats should be (5, 6), not the default (3, 4)
+        assert call_kwargs[1].get("repeats") == (5, 6) or \
+               (len(call_kwargs[0]) > 2 and call_kwargs[0][2] == (5, 6))

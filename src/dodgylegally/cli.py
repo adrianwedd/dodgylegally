@@ -174,6 +174,7 @@ def process(ctx, input_path, effects, target_bpm, stretch, pitch, target_key):
 
     for filepath in files:
         console.info(f"Processing: {os.path.basename(filepath)}")
+        temps = []
         try:
             actual_input = filepath
 
@@ -183,7 +184,6 @@ def process(ctx, input_path, effects, target_bpm, stretch, pitch, target_key):
                 from dodgylegally.transform import time_stretch_file, pitch_shift_file, key_match_file
 
                 current = filepath
-                temps = []
                 if stretch:
                     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
                     tmp.close()
@@ -217,16 +217,14 @@ def process(ctx, input_path, effects, target_bpm, stretch, pitch, target_key):
                 console.info(f"  loop:    {result[1]}")
             else:
                 console.info("  skipped (too short)")
-
-            # Clean up transform temp files
-            if stretch or pitch or target_key or target_bpm:
-                for tmp_path in temps:
-                    try:
-                        os.remove(tmp_path)
-                    except OSError:
-                        pass
         except Exception as e:
             console.error(f"  processing failed: {e}")
+        finally:
+            for tmp_path in temps:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
 
 
 @cli.command()
@@ -286,8 +284,9 @@ def combine(ctx, input_dir, repeats, strategy, template, stems):
 @click.option("--dry-run", is_flag=True, default=False, help="Show what would be done without doing it.")
 @click.option("--preset", default=None, help="Load config from a named preset (e.g. ambient, percussive).")
 @click.option("--source", "-s", multiple=True, default=None, help="Audio source with optional weight (e.g. youtube:7, local:3). Repeatable.")
+@click.option("--repeats", "-r", default="3-4", help="Repeat range for each loop in combine step (e.g. 3-4).")
 @click.pass_context
-def run(ctx, count, wordlist, delay, dry_run, preset, source):
+def run(ctx, count, wordlist, delay, dry_run, preset, source, repeats):
     """Full pipeline: search -> download -> process -> combine."""
     import os
     import time as _time
@@ -373,7 +372,8 @@ def run(ctx, count, wordlist, delay, dry_run, preset, source):
                 console.error(f"  processing failed: {e}")
 
     # Combine
-    combined = combine_loops(loop_dir, os.path.join(base, "combined"))
+    repeat_range = _parse_repeats(repeats)
+    combined = combine_loops(loop_dir, os.path.join(base, "combined"), repeats=repeat_range)
     if combined:
         console.info(f"Combined loop: {combined}")
     console.info("Done.")
