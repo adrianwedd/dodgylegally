@@ -135,8 +135,13 @@ def download(ctx, phrase, phrases_file, url, delay, dry_run, source):
 
 @cli.command()
 @click.option("--input", "-i", "input_path", default=None, help="Input file or directory. Defaults to <output>/raw/.")
+@click.option("--effects", "-e", default=None, help="Effect chain (e.g. 'reverb:0.5,lowpass:3000,bitcrush:8').")
+@click.option("--target-bpm", default=None, type=float, help="Target BPM for beat-aligned loops.")
+@click.option("--stretch", default=None, type=float, help="Time-stretch rate (e.g. 1.5 = 150%% speed).")
+@click.option("--pitch", default=None, type=float, help="Pitch-shift in semitones (e.g. +3 or -2).")
+@click.option("--target-key", default=None, help="Shift all samples to this key (e.g. 'C minor').")
 @click.pass_context
-def process(ctx, input_path):
+def process(ctx, input_path, effects, target_bpm, stretch, pitch, target_key):
     """Process audio files into one-shots and loops."""
     import glob
     import os
@@ -150,6 +155,11 @@ def process(ctx, input_path):
     loop_dir = os.path.join(base, "loop")
     os.makedirs(oneshot_dir, exist_ok=True)
     os.makedirs(loop_dir, exist_ok=True)
+
+    effect_chain = None
+    if effects:
+        from dodgylegally.effects import parse_chain
+        effect_chain = parse_chain(effects)
 
     console = ctx.obj["console"]
     if os.path.isfile(input_path):
@@ -165,7 +175,7 @@ def process(ctx, input_path):
     for filepath in files:
         console.info(f"Processing: {os.path.basename(filepath)}")
         try:
-            result = process_file(filepath, oneshot_dir, loop_dir)
+            result = process_file(filepath, oneshot_dir, loop_dir, effect_chain=effect_chain)
             if result:
                 console.info(f"  oneshot: {result[0]}")
                 console.info(f"  loop:    {result[1]}")
@@ -297,6 +307,41 @@ def run(ctx, count, wordlist, delay, dry_run, preset, source):
     if combined:
         console.info(f"Combined loop: {combined}")
     console.info("Done.")
+
+
+@cli.command()
+@click.option("--input", "-i", "input_path", default=None, help="File or directory to analyze. Defaults to <output>/raw/.")
+@click.option("--no-cache", is_flag=True, default=False, help="Force re-analysis, ignore cached results.")
+@click.pass_context
+def analyze(ctx, input_path, no_cache):
+    """Analyze audio files for BPM, key, loudness, and spectral features."""
+    import glob
+    import os
+    from dodgylegally.analyze import analyze_file
+
+    base = ctx.obj["output"]
+    if input_path is None:
+        input_path = os.path.join(base, "raw")
+    console = ctx.obj["console"]
+
+    if os.path.isfile(input_path):
+        files = [input_path]
+    elif os.path.isdir(input_path):
+        files = glob.glob(os.path.join(input_path, "*.wav"))
+        if not files:
+            console.info(f"No WAV files found in {input_path}")
+            return
+    else:
+        raise click.BadParameter(f"Input path does not exist: {input_path}")
+
+    use_cache = not no_cache
+    for filepath in sorted(files):
+        name = os.path.basename(filepath)
+        try:
+            result = analyze_file(filepath, use_cache=use_cache)
+            console.info(f"{name}: bpm={result.bpm} key={result.key} lufs={result.loudness_lufs} rms={result.rms_energy}")
+        except Exception as e:
+            console.error(f"{name}: analysis failed: {e}")
 
 
 if __name__ == "__main__":
