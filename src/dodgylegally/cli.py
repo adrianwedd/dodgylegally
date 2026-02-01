@@ -85,18 +85,23 @@ def search(ctx, count, wordlist, phrase):
 @click.option("--url", "-u", default=None, help="Direct YouTube URL to download.")
 @click.option("--delay", "-d", default=0.0, type=float, help="Seconds to wait between downloads.")
 @click.option("--dry-run", is_flag=True, default=False, help="Show what would be downloaded without doing it.")
+@click.option("--source", "-s", default="youtube", help="Audio source to use (e.g. youtube, freesound, local).")
 @click.pass_context
-def download(ctx, phrase, phrases_file, url, delay, dry_run):
-    """Download audio from YouTube."""
+def download(ctx, phrase, phrases_file, url, delay, dry_run, source):
+    """Download audio from YouTube or other sources."""
     import os
     import time as _time
-    from dodgylegally.download import download_audio, download_audio_dry_run, download_url
+    from pathlib import Path
+    from dodgylegally.sources import get_source
 
     if not dry_run:
         _check_ffmpeg()
     console = ctx.obj["console"]
     output_dir = os.path.join(ctx.obj["output"], "raw")
+    audio_source = get_source(source)
+
     if url and not dry_run:
+        from dodgylegally.download import download_url
         console.info(f"Downloading from URL: {url}")
         try:
             files = download_url(url, output_dir)
@@ -111,16 +116,19 @@ def download(ctx, phrase, phrases_file, url, delay, dry_run):
         raise click.UsageError("Provide --phrase, --phrases-file, or --url.")
     for i, p in enumerate(phrases):
         if dry_run:
-            info = download_audio_dry_run(p)
+            info = audio_source.dry_run(p)
             console.info(f"[dry-run] {info['phrase']} -> {info['url']}")
         else:
             if i > 0 and delay > 0:
                 _time.sleep(delay)
-            console.info(f"Downloading: {p}")
+            console.info(f"Downloading ({audio_source.name}): {p}")
             try:
-                files = download_audio(p, output_dir, delay=delay)
-                for f in files:
-                    console.info(f"  saved: {f}")
+                results = audio_source.search(p)
+                if not results:
+                    console.info(f"  no results for '{p}'")
+                    continue
+                clip = audio_source.download(results[0], Path(output_dir), delay=delay)
+                console.info(f"  saved: {clip.path}")
             except Exception as e:
                 console.error(f"  download failed: {e}")
 
@@ -197,13 +205,15 @@ def combine(ctx, input_dir, repeats):
 @click.option("--delay", "-d", default=None, type=float, help="Seconds to wait between downloads.")
 @click.option("--dry-run", is_flag=True, default=False, help="Show what would be done without doing it.")
 @click.option("--preset", default=None, help="Load config from a named preset (e.g. ambient, percussive).")
+@click.option("--source", "-s", multiple=True, default=None, help="Audio source with optional weight (e.g. youtube:7, local:3). Repeatable.")
 @click.pass_context
-def run(ctx, count, wordlist, delay, dry_run, preset):
+def run(ctx, count, wordlist, delay, dry_run, preset, source):
     """Full pipeline: search -> download -> process -> combine."""
     import os
     import time as _time
+    from pathlib import Path
     from dodgylegally.search import load_wordlist, generate_phrases
-    from dodgylegally.download import download_audio, download_audio_dry_run
+    from dodgylegally.sources import get_source, parse_source_weight, weighted_select
     from dodgylegally.process import process_file as process_single
     from dodgylegally.combine import combine_loops
 
@@ -218,6 +228,12 @@ def run(ctx, count, wordlist, delay, dry_run, preset):
 
     if delay is None:
         delay = 0.0
+
+    # Parse source weights
+    if source:
+        source_weights = [parse_source_weight(s) for s in source]
+    else:
+        source_weights = [("youtube", 1)]
 
     if not dry_run:
         _check_ffmpeg()
@@ -234,8 +250,10 @@ def run(ctx, count, wordlist, delay, dry_run, preset):
 
     if dry_run:
         for phrase in phrases:
-            info = download_audio_dry_run(phrase)
-            console.info(f"[dry-run] {info['phrase']} -> {info['url']}")
+            source_name = weighted_select(source_weights)
+            src = get_source(source_name)
+            info = src.dry_run(phrase)
+            console.info(f"[dry-run] ({source_name}) {info['phrase']} -> {info.get('url', 'N/A')}")
         console.info(f"[dry-run] Would download {len(phrases)} clips, process, and combine.")
         return
 
@@ -247,9 +265,16 @@ def run(ctx, count, wordlist, delay, dry_run, preset):
     for i, phrase in enumerate(phrases):
         if i > 0 and delay > 0:
             _time.sleep(delay)
-        console.info(f"Downloading: {phrase}")
+        source_name = weighted_select(source_weights)
+        audio_source = get_source(source_name)
+        console.info(f"Downloading ({source_name}): {phrase}")
         try:
-            new_files = download_audio(phrase, raw_dir, delay=delay)
+            results = audio_source.search(phrase)
+            if not results:
+                console.info(f"  no results for '{phrase}'")
+                continue
+            clip = audio_source.download(results[0], Path(raw_dir), delay=delay)
+            new_files = [str(clip.path)]
         except Exception as e:
             console.error(f"  download failed: {e}")
             continue
