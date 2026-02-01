@@ -50,6 +50,22 @@ def test_weighted_select_single_source():
     assert weighted_select(sources) == "youtube"
 
 
+def test_parse_source_weight_negative_raises():
+    """Parse 'youtube:-5' raises ValueError for negative weight."""
+    from dodgylegally.sources import parse_source_weight
+
+    with pytest.raises(ValueError, match="must be positive"):
+        parse_source_weight("youtube:-5")
+
+
+def test_parse_source_weight_zero_raises():
+    """Parse 'youtube:0' raises ValueError for zero weight."""
+    from dodgylegally.sources import parse_source_weight
+
+    with pytest.raises(ValueError, match="must be positive"):
+        parse_source_weight("youtube:0")
+
+
 def test_cli_run_accepts_source_flag():
     """CLI run subcommand accepts --source flag."""
     from click.testing import CliRunner

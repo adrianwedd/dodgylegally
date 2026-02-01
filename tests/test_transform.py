@@ -110,6 +110,55 @@ def test_key_match_file(tmp_path):
     assert len(y) > 0
 
 
+def test_cli_process_stretch_applies(tmp_path):
+    """CLI process --stretch actually calls time_stretch_file."""
+    from unittest.mock import patch
+    from click.testing import CliRunner
+    from dodgylegally.cli import cli
+
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    _make_sine_wav(raw_dir / "test.wav", duration_s=2.0)
+
+    with patch("dodgylegally.transform.time_stretch_file") as mock_stretch:
+        # Make mock return a valid path so processing can continue
+        mock_stretch.side_effect = lambda inp, out, rate: (
+            sf.write(out, np.zeros(22050), 22050) or out
+        )
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "--output", str(tmp_path),
+            "process", "--stretch", "2.0",
+        ])
+        assert result.exit_code == 0, result.output
+        mock_stretch.assert_called_once()
+        _, kwargs = mock_stretch.call_args
+        assert kwargs.get("rate") == 2.0 or mock_stretch.call_args[0][2] == 2.0
+
+
+def test_cli_process_pitch_applies(tmp_path):
+    """CLI process --pitch actually calls pitch_shift_file."""
+    from unittest.mock import patch
+    from click.testing import CliRunner
+    from dodgylegally.cli import cli
+
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    _make_sine_wav(raw_dir / "test.wav", duration_s=2.0)
+
+    with patch("dodgylegally.transform.pitch_shift_file") as mock_pitch:
+        mock_pitch.side_effect = lambda inp, out, semitones: (
+            sf.write(out, np.zeros(22050), 22050) or out
+        )
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "--output", str(tmp_path),
+            "process", "--pitch", "3",
+        ])
+        assert result.exit_code == 0, result.output
+        mock_pitch.assert_called_once()
+
+
 def test_cli_process_accepts_transform_flags():
     """CLI process subcommand accepts --stretch, --pitch, --target-key flags."""
     from click.testing import CliRunner

@@ -23,7 +23,6 @@ def export_stems(loop_dir: str, output_dir: str, repeats: tuple[int, int] = (3, 
     if not wav_files:
         manifest = {"tracks": [], "full_mix": None}
         manifest_path = os.path.join(output_dir, "manifest.json")
-        Path_obj = os.path.join(output_dir, "manifest.json")
         with open(manifest_path, "w") as f:
             json.dump(manifest, f, indent=2)
         return manifest

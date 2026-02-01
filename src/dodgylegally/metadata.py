@@ -27,11 +27,14 @@ def write_sidecar(audio_path: Path, metadata: dict) -> Path:
 
 
 def read_sidecar(audio_path: Path) -> dict:
-    """Read a JSON sidecar for an audio file. Returns empty dict if none exists."""
+    """Read a JSON sidecar for an audio file. Returns empty dict if none exists or is malformed."""
     path = sidecar_path(Path(audio_path))
     if not path.exists():
         return {}
-    return json.loads(path.read_text())
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, ValueError):
+        return {}
 
 
 def merge_sidecar(audio_path: Path, new_metadata: dict) -> dict:

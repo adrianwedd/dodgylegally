@@ -38,6 +38,8 @@ def parse_source_weight(spec: str) -> tuple[str, int]:
             weight = int(weight_str)
         except ValueError:
             raise ValueError(f"Invalid weight in '{spec}': '{weight_str}' is not an integer")
+        if weight <= 0:
+            raise ValueError(f"Weight must be positive in '{spec}', got {weight}")
         return name, weight
     return spec, 1
 

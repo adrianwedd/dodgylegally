@@ -175,12 +175,56 @@ def process(ctx, input_path, effects, target_bpm, stretch, pitch, target_key):
     for filepath in files:
         console.info(f"Processing: {os.path.basename(filepath)}")
         try:
-            result = process_file(filepath, oneshot_dir, loop_dir, effect_chain=effect_chain)
+            actual_input = filepath
+
+            # Apply transforms to a temp copy before processing
+            if stretch or pitch or target_key or target_bpm:
+                import tempfile
+                from dodgylegally.transform import time_stretch_file, pitch_shift_file, key_match_file
+
+                current = filepath
+                temps = []
+                if stretch:
+                    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                    tmp.close()
+                    time_stretch_file(current, tmp.name, rate=stretch)
+                    temps.append(tmp.name)
+                    current = tmp.name
+                if pitch:
+                    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                    tmp.close()
+                    pitch_shift_file(current, tmp.name, semitones=pitch)
+                    temps.append(tmp.name)
+                    current = tmp.name
+                if target_key:
+                    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                    tmp.close()
+                    key_match_file(current, tmp.name, target_key=target_key)
+                    temps.append(tmp.name)
+                    current = tmp.name
+                if target_bpm:
+                    from dodgylegally.looping import make_bpm_loop
+                    tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                    tmp.close()
+                    make_bpm_loop(current, tmp.name, target_bpm=target_bpm)
+                    temps.append(tmp.name)
+                    current = tmp.name
+                actual_input = current
+
+            result = process_file(actual_input, oneshot_dir, loop_dir, effect_chain=effect_chain)
             if result:
                 console.info(f"  oneshot: {result[0]}")
                 console.info(f"  loop:    {result[1]}")
             else:
                 console.info("  skipped (too short)")
+
+            # Clean up transform temp files
+            if stretch or pitch or target_key or target_bpm:
+                for tmp_path in temps:
+                    try:
+                        os.remove(tmp_path)
+                    except OSError:
+                        pass
         except Exception as e:
             console.error(f"  processing failed: {e}")
 

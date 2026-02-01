@@ -88,6 +88,19 @@ def test_sidecar_from_downloaded_clip(tmp_path):
     assert meta["query"] == "test"
 
 
+def test_read_sidecar_malformed_json_returns_empty(tmp_path):
+    """read_sidecar returns empty dict when sidecar has malformed JSON."""
+    from dodgylegally.metadata import read_sidecar
+
+    wav_path = tmp_path / "corrupted.wav"
+    wav_path.touch()
+    json_path = tmp_path / "corrupted.json"
+    json_path.write_text("{bad json content")
+
+    data = read_sidecar(wav_path)
+    assert data == {}
+
+
 def test_sidecar_path_helper():
     """sidecar_path returns .json path for a .wav path."""
     from dodgylegally.metadata import sidecar_path
