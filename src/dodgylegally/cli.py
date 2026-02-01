@@ -188,8 +188,9 @@ def process(ctx, input_path, effects, target_bpm, stretch, pitch, target_key):
 @cli.command()
 @click.option("--input", "-i", "input_dir", default=None, help="Directory with loop files. Defaults to <output>/loop/.")
 @click.option("--repeats", "-r", default="3-4", help="Repeat range for each loop (e.g. 3-4).")
+@click.option("--strategy", "-s", default="sequential", help="Arrangement strategy (sequential, loudness, tempo, key_compatible, layered).")
 @click.pass_context
-def combine(ctx, input_dir, repeats):
+def combine(ctx, input_dir, repeats, strategy):
     """Merge loop files into a combined file."""
     import os
     from dodgylegally.combine import combine_loops
@@ -202,7 +203,7 @@ def combine(ctx, input_dir, repeats):
     output_dir = os.path.join(base, "combined")
 
     console = ctx.obj["console"]
-    result = combine_loops(input_dir, output_dir, repeats=repeat_range)
+    result = combine_loops(input_dir, output_dir, repeats=repeat_range, strategy=strategy)
     if result:
         console.info(f"Combined loop: {result}")
     else:

@@ -5,11 +5,20 @@ import random
 from pydub import AudioSegment
 
 
-def combine_loops(loop_dir: str, output_dir: str, repeats: tuple[int, int] = (3, 4)) -> str | None:
-    """Combine all loops into a versioned file. Returns output path, or None if no loops."""
+def combine_loops(loop_dir: str, output_dir: str, repeats: tuple[int, int] = (3, 4),
+                  strategy: str = "sequential") -> str | None:
+    """Combine all loops into a versioned file. Returns output path, or None if no loops.
+
+    Uses the named arrangement strategy to order files before combining.
+    """
     wav_files = glob.glob(os.path.join(loop_dir, "*.wav"))
     if not wav_files:
         return None
+
+    # Apply arrangement strategy
+    from dodgylegally.strategies import get_strategy
+    strat = get_strategy(strategy)
+    wav_files = strat.arrange(wav_files)
 
     os.makedirs(output_dir, exist_ok=True)
     combined = AudioSegment.empty()
