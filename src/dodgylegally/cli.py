@@ -80,16 +80,20 @@ def search(ctx, count, wordlist, phrase):
 @click.option("--phrase", "-p", multiple=True, help="Search phrase(s) to download.")
 @click.option("--phrases-file", "-f", type=click.File("r"), default=None, help="File with phrases, one per line. Use - for stdin.")
 @click.option("--url", "-u", default=None, help="Direct YouTube URL to download.")
+@click.option("--delay", "-d", default=0.0, type=float, help="Seconds to wait between downloads.")
+@click.option("--dry-run", is_flag=True, default=False, help="Show what would be downloaded without doing it.")
 @click.pass_context
-def download(ctx, phrase, phrases_file, url):
+def download(ctx, phrase, phrases_file, url, delay, dry_run):
     """Download audio from YouTube."""
     import os
-    from dodgylegally.download import download_audio, download_url
+    import time as _time
+    from dodgylegally.download import download_audio, download_audio_dry_run, download_url
 
-    _check_ffmpeg()
+    if not dry_run:
+        _check_ffmpeg()
     console = ctx.obj["console"]
     output_dir = os.path.join(ctx.obj["output"], "raw")
-    if url:
+    if url and not dry_run:
         console.info(f"Downloading from URL: {url}")
         try:
             files = download_url(url, output_dir)
@@ -102,14 +106,20 @@ def download(ctx, phrase, phrases_file, url):
         phrases.extend(line.strip() for line in phrases_file if line.strip())
     if not phrases and not url:
         raise click.UsageError("Provide --phrase, --phrases-file, or --url.")
-    for p in phrases:
-        console.info(f"Downloading: {p}")
-        try:
-            files = download_audio(p, output_dir)
-            for f in files:
-                console.info(f"  saved: {f}")
-        except Exception as e:
-            console.error(f"  download failed: {e}")
+    for i, p in enumerate(phrases):
+        if dry_run:
+            info = download_audio_dry_run(p)
+            console.info(f"[dry-run] {info['phrase']} -> {info['url']}")
+        else:
+            if i > 0 and delay > 0:
+                _time.sleep(delay)
+            console.info(f"Downloading: {p}")
+            try:
+                files = download_audio(p, output_dir, delay=delay)
+                for f in files:
+                    console.info(f"  saved: {f}")
+            except Exception as e:
+                console.error(f"  download failed: {e}")
 
 
 @cli.command()
@@ -181,35 +191,49 @@ def combine(ctx, input_dir, repeats):
 @cli.command()
 @click.option("--count", "-c", required=True, type=int, help="Number of samples to generate.")
 @click.option("--wordlist", "-w", default=None, help="Path to custom word list file.")
+@click.option("--delay", "-d", default=0.0, type=float, help="Seconds to wait between downloads.")
+@click.option("--dry-run", is_flag=True, default=False, help="Show what would be done without doing it.")
 @click.pass_context
-def run(ctx, count, wordlist):
+def run(ctx, count, wordlist, delay, dry_run):
     """Full pipeline: search -> download -> process -> combine."""
     import os
+    import time as _time
     from dodgylegally.search import load_wordlist, generate_phrases
-    from dodgylegally.download import download_audio
+    from dodgylegally.download import download_audio, download_audio_dry_run
     from dodgylegally.process import process_file as process_single
     from dodgylegally.combine import combine_loops
 
-    _check_ffmpeg()
+    if not dry_run:
+        _check_ffmpeg()
     console = ctx.obj["console"]
     base = ctx.obj["output"]
     raw_dir = os.path.join(base, "raw")
     oneshot_dir = os.path.join(base, "oneshot")
     loop_dir = os.path.join(base, "loop")
-    os.makedirs(raw_dir, exist_ok=True)
-    os.makedirs(oneshot_dir, exist_ok=True)
-    os.makedirs(loop_dir, exist_ok=True)
 
     # Search
     words = load_wordlist(wordlist)
     phrases = generate_phrases(words, count)
     console.info(f"Generated {len(phrases)} search phrases")
 
+    if dry_run:
+        for phrase in phrases:
+            info = download_audio_dry_run(phrase)
+            console.info(f"[dry-run] {info['phrase']} -> {info['url']}")
+        console.info(f"[dry-run] Would download {len(phrases)} clips, process, and combine.")
+        return
+
+    os.makedirs(raw_dir, exist_ok=True)
+    os.makedirs(oneshot_dir, exist_ok=True)
+    os.makedirs(loop_dir, exist_ok=True)
+
     # Download + Process
-    for phrase in phrases:
+    for i, phrase in enumerate(phrases):
+        if i > 0 and delay > 0:
+            _time.sleep(delay)
         console.info(f"Downloading: {phrase}")
         try:
-            new_files = download_audio(phrase, raw_dir)
+            new_files = download_audio(phrase, raw_dir, delay=delay)
         except Exception as e:
             console.error(f"  download failed: {e}")
             continue
