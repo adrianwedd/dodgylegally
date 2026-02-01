@@ -85,18 +85,23 @@ def search(ctx, count, wordlist, phrase):
 @click.option("--url", "-u", default=None, help="Direct YouTube URL to download.")
 @click.option("--delay", "-d", default=0.0, type=float, help="Seconds to wait between downloads.")
 @click.option("--dry-run", is_flag=True, default=False, help="Show what would be downloaded without doing it.")
+@click.option("--source", "-s", default="youtube", help="Audio source to use (e.g. youtube, freesound, local).")
 @click.pass_context
-def download(ctx, phrase, phrases_file, url, delay, dry_run):
-    """Download audio from YouTube."""
+def download(ctx, phrase, phrases_file, url, delay, dry_run, source):
+    """Download audio from YouTube or other sources."""
     import os
     import time as _time
-    from dodgylegally.download import download_audio, download_audio_dry_run, download_url
+    from pathlib import Path
+    from dodgylegally.sources import get_source
 
     if not dry_run:
         _check_ffmpeg()
     console = ctx.obj["console"]
     output_dir = os.path.join(ctx.obj["output"], "raw")
+    audio_source = get_source(source)
+
     if url and not dry_run:
+        from dodgylegally.download import download_url
         console.info(f"Downloading from URL: {url}")
         try:
             files = download_url(url, output_dir)
@@ -111,16 +116,19 @@ def download(ctx, phrase, phrases_file, url, delay, dry_run):
         raise click.UsageError("Provide --phrase, --phrases-file, or --url.")
     for i, p in enumerate(phrases):
         if dry_run:
-            info = download_audio_dry_run(p)
+            info = audio_source.dry_run(p)
             console.info(f"[dry-run] {info['phrase']} -> {info['url']}")
         else:
             if i > 0 and delay > 0:
                 _time.sleep(delay)
-            console.info(f"Downloading: {p}")
+            console.info(f"Downloading ({audio_source.name}): {p}")
             try:
-                files = download_audio(p, output_dir, delay=delay)
-                for f in files:
-                    console.info(f"  saved: {f}")
+                results = audio_source.search(p)
+                if not results:
+                    console.info(f"  no results for '{p}'")
+                    continue
+                clip = audio_source.download(results[0], Path(output_dir), delay=delay)
+                console.info(f"  saved: {clip.path}")
             except Exception as e:
                 console.error(f"  download failed: {e}")
 
