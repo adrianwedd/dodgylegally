@@ -48,14 +48,17 @@ class _MutuallyExclusiveOption(click.Option):
 @click.option("--output", "-o", default="./dodgylegally_output", help="Output directory.")
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Show debug output.", cls=_MutuallyExclusiveOption, mutually_exclusive=["quiet"])
 @click.option("--quiet", "-q", is_flag=True, default=False, help="Suppress all output except errors.", cls=_MutuallyExclusiveOption, mutually_exclusive=["verbose"])
+@click.option("--log-file", default=None, type=click.Path(), help="Write structured log to file.")
 @click.pass_context
-def cli(ctx, output, verbose, quiet):
+def cli(ctx, output, verbose, quiet, log_file):
     """Creative audio sampling tool."""
     from dodgylegally.ui import Console
+    from dodgylegally.logging_config import setup_logging
 
     ctx.ensure_object(dict)
     ctx.obj["output"] = output
     ctx.obj["console"] = Console(quiet=quiet, verbose=verbose)
+    ctx.obj["logger"] = setup_logging(verbose=verbose, quiet=quiet, log_file=log_file)
 
 
 @cli.command()
