@@ -299,5 +299,40 @@ def run(ctx, count, wordlist, delay, dry_run, preset, source):
     console.info("Done.")
 
 
+@cli.command()
+@click.option("--input", "-i", "input_path", default=None, help="File or directory to analyze. Defaults to <output>/raw/.")
+@click.option("--no-cache", is_flag=True, default=False, help="Force re-analysis, ignore cached results.")
+@click.pass_context
+def analyze(ctx, input_path, no_cache):
+    """Analyze audio files for BPM, key, loudness, and spectral features."""
+    import glob
+    import os
+    from dodgylegally.analyze import analyze_file
+
+    base = ctx.obj["output"]
+    if input_path is None:
+        input_path = os.path.join(base, "raw")
+    console = ctx.obj["console"]
+
+    if os.path.isfile(input_path):
+        files = [input_path]
+    elif os.path.isdir(input_path):
+        files = glob.glob(os.path.join(input_path, "*.wav"))
+        if not files:
+            console.info(f"No WAV files found in {input_path}")
+            return
+    else:
+        raise click.BadParameter(f"Input path does not exist: {input_path}")
+
+    use_cache = not no_cache
+    for filepath in sorted(files):
+        name = os.path.basename(filepath)
+        try:
+            result = analyze_file(filepath, use_cache=use_cache)
+            console.info(f"{name}: bpm={result.bpm} key={result.key} lufs={result.loudness_lufs} rms={result.rms_energy}")
+        except Exception as e:
+            console.error(f"{name}: analysis failed: {e}")
+
+
 if __name__ == "__main__":
     cli()

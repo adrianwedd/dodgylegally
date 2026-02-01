@@ -9,8 +9,10 @@ description = "Creative audio sampling tool — generates random samples from Yo
 requires-python = ">=3.10"
 dependencies = [
     "click>=8.0",
+    "librosa>=0.10",
     "pydub>=0.25",
     "pyyaml>=6.0",
+    "soundfile>=0.12",
     "yt-dlp>=2023.0",
 ]
 
