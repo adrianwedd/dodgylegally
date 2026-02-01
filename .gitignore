@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Audio output (large binary files)
+case_study_output/
+case_study_tornado/
+dodgylegally_output/
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.aif
+*.aiff
+
+# Claude Code
+.claude/
+
+# Environment
+.env
+.env.local

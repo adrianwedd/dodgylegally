@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dodgylegally"
+version = "0.1.0"
+description = "Creative audio sampling tool — generates random samples from YouTube"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0",
+    "pydub>=0.25",
+    "yt-dlp>=2023.0",
+]
+
+[project.scripts]
+dodgylegally = "dodgylegally.cli:cli"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
