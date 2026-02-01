@@ -36,14 +36,34 @@ def make_loop(input_path: str, output_path: str) -> str:
     return output_path
 
 
-def process_file(input_path: str, oneshot_dir: str, loop_dir: str) -> tuple[str, str] | None:
-    """Process a single WAV into one-shot + loop variants. Returns paths or None if too short."""
+def process_file(input_path: str, oneshot_dir: str, loop_dir: str, effect_chain=None) -> tuple[str, str] | None:
+    """Process a single WAV into one-shot + loop variants. Returns paths or None if too short.
+
+    If effect_chain is provided, applies it to the audio before processing.
+    """
     sound = AudioSegment.from_file(input_path, "wav")
     if len(sound) <= 500:
         return None
+
     basename = os.path.basename(input_path)
+    actual_input = input_path
+
+    if effect_chain is not None:
+        import tempfile
+        sound = effect_chain.apply(sound)
+        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        sound.export(tmp.name, format="wav")
+        actual_input = tmp.name
+
     oneshot_path = os.path.join(oneshot_dir, f"oneshot_{basename}")
     loop_path = os.path.join(loop_dir, f"loop_{basename}")
-    make_oneshot(input_path, oneshot_path)
-    make_loop(input_path, loop_path)
+    make_oneshot(actual_input, oneshot_path)
+    make_loop(actual_input, loop_path)
+
+    if effect_chain is not None:
+        try:
+            os.remove(actual_input)
+        except OSError:
+            pass
+
     return (oneshot_path, loop_path)

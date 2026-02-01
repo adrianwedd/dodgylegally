@@ -135,8 +135,9 @@ def download(ctx, phrase, phrases_file, url, delay, dry_run, source):
 
 @cli.command()
 @click.option("--input", "-i", "input_path", default=None, help="Input file or directory. Defaults to <output>/raw/.")
+@click.option("--effects", "-e", default=None, help="Effect chain (e.g. 'reverb:0.5,lowpass:3000,bitcrush:8').")
 @click.pass_context
-def process(ctx, input_path):
+def process(ctx, input_path, effects):
     """Process audio files into one-shots and loops."""
     import glob
     import os
@@ -150,6 +151,11 @@ def process(ctx, input_path):
     loop_dir = os.path.join(base, "loop")
     os.makedirs(oneshot_dir, exist_ok=True)
     os.makedirs(loop_dir, exist_ok=True)
+
+    effect_chain = None
+    if effects:
+        from dodgylegally.effects import parse_chain
+        effect_chain = parse_chain(effects)
 
     console = ctx.obj["console"]
     if os.path.isfile(input_path):
@@ -165,7 +171,7 @@ def process(ctx, input_path):
     for filepath in files:
         console.info(f"Processing: {os.path.basename(filepath)}")
         try:
-            result = process_file(filepath, oneshot_dir, loop_dir)
+            result = process_file(filepath, oneshot_dir, loop_dir, effect_chain=effect_chain)
             if result:
                 console.info(f"  oneshot: {result[0]}")
                 console.info(f"  loop:    {result[1]}")
