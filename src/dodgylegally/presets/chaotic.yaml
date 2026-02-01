@@ -1,0 +1,4 @@
+count: 50
+delay: 1.0
+combine:
+  repeats: "1-2"

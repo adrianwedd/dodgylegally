@@ -191,10 +191,11 @@ def combine(ctx, input_dir, repeats):
 @cli.command()
 @click.option("--count", "-c", required=True, type=int, help="Number of samples to generate.")
 @click.option("--wordlist", "-w", default=None, help="Path to custom word list file.")
-@click.option("--delay", "-d", default=0.0, type=float, help="Seconds to wait between downloads.")
+@click.option("--delay", "-d", default=None, type=float, help="Seconds to wait between downloads.")
 @click.option("--dry-run", is_flag=True, default=False, help="Show what would be done without doing it.")
+@click.option("--preset", default=None, help="Load config from a named preset (e.g. ambient, percussive).")
 @click.pass_context
-def run(ctx, count, wordlist, delay, dry_run):
+def run(ctx, count, wordlist, delay, dry_run, preset):
     """Full pipeline: search -> download -> process -> combine."""
     import os
     import time as _time
@@ -202,6 +203,18 @@ def run(ctx, count, wordlist, delay, dry_run):
     from dodgylegally.download import download_audio, download_audio_dry_run
     from dodgylegally.process import process_file as process_single
     from dodgylegally.combine import combine_loops
+
+    # Apply preset config, CLI flags override
+    if preset:
+        from dodgylegally.config import load_preset, merge_config
+        preset_cfg = load_preset(preset)
+        overrides = {"count": count, "delay": delay}
+        cfg = merge_config(preset_cfg, overrides)
+        count = cfg.get("count", count)
+        delay = cfg.get("delay", delay)
+
+    if delay is None:
+        delay = 0.0
 
     if not dry_run:
         _check_ffmpeg()
