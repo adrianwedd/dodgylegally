@@ -1,0 +1,15 @@
+name: rhythmic-collage
+description: Tempo-grouped sections with percussive energy.
+sections:
+  - name: slow
+    strategy: tempo
+    duration_s: 6
+  - name: medium
+    strategy: tempo
+    duration_s: 8
+  - name: fast
+    strategy: tempo
+    duration_s: 6
+  - name: breakdown
+    strategy: layered
+    duration_s: 4

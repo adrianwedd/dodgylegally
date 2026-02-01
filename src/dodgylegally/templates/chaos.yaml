@@ -1,0 +1,15 @@
+name: chaos
+description: No logic. Sequential order, short sections, rapid transitions.
+sections:
+  - name: burst-1
+    strategy: sequential
+    duration_s: 3
+  - name: burst-2
+    strategy: sequential
+    duration_s: 3
+  - name: burst-3
+    strategy: sequential
+    duration_s: 3
+  - name: burst-4
+    strategy: sequential
+    duration_s: 3

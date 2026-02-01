@@ -188,8 +188,11 @@ def process(ctx, input_path, effects, target_bpm, stretch, pitch, target_key):
 @cli.command()
 @click.option("--input", "-i", "input_dir", default=None, help="Directory with loop files. Defaults to <output>/loop/.")
 @click.option("--repeats", "-r", default="3-4", help="Repeat range for each loop (e.g. 3-4).")
+@click.option("--strategy", "-s", default="sequential", help="Arrangement strategy (sequential, loudness, tempo, key_compatible, layered).")
+@click.option("--template", "-t", default=None, help="Use an arrangement template (e.g. build-and-drop, ambient-drift).")
+@click.option("--stems", is_flag=True, default=False, help="Export individual stem files alongside full mix.")
 @click.pass_context
-def combine(ctx, input_dir, repeats):
+def combine(ctx, input_dir, repeats, strategy, template, stems):
     """Merge loop files into a combined file."""
     import os
     from dodgylegally.combine import combine_loops
@@ -202,11 +205,34 @@ def combine(ctx, input_dir, repeats):
     output_dir = os.path.join(base, "combined")
 
     console = ctx.obj["console"]
-    result = combine_loops(input_dir, output_dir, repeats=repeat_range)
-    if result:
-        console.info(f"Combined loop: {result}")
+
+    if stems:
+        from dodgylegally.stems import export_stems
+        stem_dir = os.path.join(base, "stems")
+        result = export_stems(input_dir, stem_dir, repeats=repeat_range, strategy=strategy)
+        if result["tracks"]:
+            console.info(f"Exported {len(result['tracks'])} stems to {stem_dir}")
+            console.info(f"Full mix: {result['full_mix']}")
+        else:
+            console.info("No loop files found for stem export.")
+    elif template:
+        from dodgylegally.strategies.templates import load_template, apply_template
+        tmpl = load_template(template)
+        os.makedirs(output_dir, exist_ok=True)
+        version = 1
+        while True:
+            output_path = os.path.join(output_dir, f"combined_loop_v{version}.wav")
+            if not os.path.exists(output_path):
+                break
+            version += 1
+        result = apply_template(tmpl, input_dir, output_path, repeats=repeat_range)
+        console.info(f"Combined loop (template={template}): {result}")
     else:
-        console.info("No loop files found to combine.")
+        result = combine_loops(input_dir, output_dir, repeats=repeat_range, strategy=strategy)
+        if result:
+            console.info(f"Combined loop: {result}")
+        else:
+            console.info("No loop files found to combine.")
 
 
 @cli.command()

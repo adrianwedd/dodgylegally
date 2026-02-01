@@ -1,0 +1,19 @@
+name: build-and-drop
+description: Quiet intro builds to a layered climax, then drops away.
+sections:
+  - name: intro
+    strategy: loudness
+    duration_s: 8
+    kwargs:
+      descending: false
+  - name: build
+    strategy: tempo
+    duration_s: 6
+  - name: drop
+    strategy: layered
+    duration_s: 4
+  - name: outro
+    strategy: loudness
+    duration_s: 6
+    kwargs:
+      descending: true
