@@ -1,7 +1,27 @@
 import glob
 import os
+import time
 
 from yt_dlp import YoutubeDL
+
+
+class DownloadSkipError(Exception):
+    """Raised when a download should be skipped (e.g., no results found)."""
+
+
+_SKIP_PATTERNS = [
+    "no video results",
+    "no suitable video",
+    "is not a valid url",
+    "unable to extract",
+    "video unavailable",
+]
+
+
+def _is_skip_error(error: Exception) -> bool:
+    """Check if an error indicates the download should be skipped (not retried)."""
+    msg = str(error).lower()
+    return any(pattern in msg for pattern in _SKIP_PATTERNS)
 
 
 class _DownloadRangeFunc:
@@ -35,15 +55,43 @@ def _find_new_files(directory: str, before: set[str]) -> list[str]:
     return list(after - before)
 
 
-def download_audio(phrase: str, output_dir: str) -> list[str]:
-    """Download 1s audio clip from YouTube search for phrase. Returns list of downloaded file paths."""
+def download_audio(
+    phrase: str,
+    output_dir: str,
+    max_retries: int = 3,
+    delay: float = 0,
+    dry_run: bool = False,
+) -> list[str]:
+    """Download 1s audio clip from YouTube search for phrase.
+
+    Returns list of downloaded file paths.
+    Retries transient errors up to max_retries with exponential backoff.
+    Raises DownloadSkipError for non-retryable errors (no results, etc.).
+    In dry_run mode, returns empty list without making network calls.
+    """
+    if dry_run:
+        return []
+
     os.makedirs(output_dir, exist_ok=True)
     before = set(glob.glob(os.path.join(output_dir, "*.wav")))
     url = f'ytsearch1:"{phrase}"'
     opts = make_download_options(phrase, output_dir)
-    with YoutubeDL(opts) as ydl:
-        ydl.download([url])
-    return _find_new_files(output_dir, before)
+
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            with YoutubeDL(opts) as ydl:
+                ydl.download([url])
+            return _find_new_files(output_dir, before)
+        except Exception as e:
+            if _is_skip_error(e):
+                raise DownloadSkipError(str(e)) from e
+            last_error = e
+            if attempt < max_retries - 1:
+                backoff = delay + (2 ** attempt)
+                time.sleep(backoff)
+
+    raise last_error
 
 
 def download_url(url: str, output_dir: str) -> list[str]:
@@ -54,3 +102,12 @@ def download_url(url: str, output_dir: str) -> list[str]:
     with YoutubeDL(opts) as ydl:
         ydl.download([url])
     return _find_new_files(output_dir, before)
+
+
+def download_audio_dry_run(phrase: str) -> dict:
+    """Return info about what would be downloaded without making network calls."""
+    return {
+        "phrase": phrase,
+        "url": f'ytsearch1:"{phrase}"',
+        "action": "would search and download 1s clip",
+    }
