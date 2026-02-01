@@ -102,3 +102,21 @@ def test_local_source_search_empty_dir(tmp_path):
     source = LocalSource(base_path=tmp_path)
     results = source.search("*")
     assert results == []
+
+
+def test_local_source_search_filters_by_query(tmp_path):
+    """search uses the query as a glob pattern to filter files."""
+    from dodgylegally.sources.local import LocalSource
+
+    _make_wav(tmp_path / "rain_001.wav")
+    _make_wav(tmp_path / "rain_002.wav")
+    _make_wav(tmp_path / "thunder_001.wav")
+
+    source = LocalSource(base_path=tmp_path)
+
+    # Query "rain*" should only return rain files
+    results = source.search("rain*", max_results=10)
+    names = {r.title for r in results}
+    assert "rain_001.wav" in names
+    assert "rain_002.wav" in names
+    assert "thunder_001.wav" not in names

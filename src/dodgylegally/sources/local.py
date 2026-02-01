@@ -29,7 +29,7 @@ class LocalSource:
         Returns a random selection of up to max_results files.
         """
         files = [
-            f for f in self._base_path.rglob("*")
+            f for f in self._base_path.rglob(query)
             if f.is_file() and f.suffix.lower() in _SUPPORTED_EXTENSIONS
         ]
         if not files:
