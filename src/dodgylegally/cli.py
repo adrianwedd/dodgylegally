@@ -190,8 +190,9 @@ def process(ctx, input_path, effects, target_bpm, stretch, pitch, target_key):
 @click.option("--repeats", "-r", default="3-4", help="Repeat range for each loop (e.g. 3-4).")
 @click.option("--strategy", "-s", default="sequential", help="Arrangement strategy (sequential, loudness, tempo, key_compatible, layered).")
 @click.option("--template", "-t", default=None, help="Use an arrangement template (e.g. build-and-drop, ambient-drift).")
+@click.option("--stems", is_flag=True, default=False, help="Export individual stem files alongside full mix.")
 @click.pass_context
-def combine(ctx, input_dir, repeats, strategy, template):
+def combine(ctx, input_dir, repeats, strategy, template, stems):
     """Merge loop files into a combined file."""
     import os
     from dodgylegally.combine import combine_loops
@@ -205,7 +206,16 @@ def combine(ctx, input_dir, repeats, strategy, template):
 
     console = ctx.obj["console"]
 
-    if template:
+    if stems:
+        from dodgylegally.stems import export_stems
+        stem_dir = os.path.join(base, "stems")
+        result = export_stems(input_dir, stem_dir, repeats=repeat_range, strategy=strategy)
+        if result["tracks"]:
+            console.info(f"Exported {len(result['tracks'])} stems to {stem_dir}")
+            console.info(f"Full mix: {result['full_mix']}")
+        else:
+            console.info("No loop files found for stem export.")
+    elif template:
         from dodgylegally.strategies.templates import load_template, apply_template
         tmpl = load_template(template)
         os.makedirs(output_dir, exist_ok=True)
