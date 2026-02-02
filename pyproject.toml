@@ -5,8 +5,23 @@ build-backend = "hatchling.build"
 [project]
 name = "dodgylegally"
 version = "0.1.0"
-description = "Creative audio sampling tool — generates random samples from YouTube"
+description = "Creative audio sampling CLI — turns random words into instruments via YouTube and beyond"
+readme = "README.md"
+license = {file = "UNLICENSE"}
 requires-python = ">=3.10"
+keywords = ["audio", "sampling", "music", "cli", "creative-coding", "sample-pack"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: The Unlicense (Unlicense)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Multimedia :: Sound/Audio :: Editors",
+]
 dependencies = [
     "click>=8.0",
     "librosa>=0.10",
@@ -15,6 +30,14 @@ dependencies = [
     "soundfile>=0.12",
     "yt-dlp>=2023.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/adrianwedd/dodgylegally"
+Issues = "https://github.com/adrianwedd/dodgylegally/issues"
+Documentation = "https://github.com/adrianwedd/dodgylegally#readme"
+
+[project.optional-dependencies]
+whisper = ["faster-whisper>=1.0"]
 
 [project.scripts]
 dodgylegally = "dodgylegally.cli:cli"

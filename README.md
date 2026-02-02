@@ -199,23 +199,31 @@ Two documented experiments exploring different approaches:
 ```
 src/dodgylegally/
 ├── cli.py              Click CLI with subcommands
+├── clip.py             Clip extraction config (position, duration)
 ├── search.py           Word list loading, phrase generation
 ├── download.py         Direct URL download (yt-dlp)
 ├── process.py          One-shot and loop processing (pydub)
 ├── combine.py          Versioned loop merging
 ├── config.py           YAML preset loading and merging
 ├── metadata.py         JSON sidecar system for provenance
+├── analyze.py          BPM, key, loudness, spectral analysis
+├── looping.py          BPM-aware loop creation, beat alignment
+├── transform.py        Pitch shifting, time stretching
+├── stems.py            Multi-track stem export
 ├── ui.py               Console output (quiet/verbose modes)
 ├── logging_config.py   Structured logging configuration
 ├── wordlist.txt        Bundled 5,000-word dictionary
 ├── presets/            Bundled YAML presets
+├── effects/            Pluggable audio effects (reverb, bitcrush, etc.)
+├── strategies/         Arrangement strategies (tempo, key, layered, etc.)
+├── templates/          YAML arrangement templates
 └── sources/            Pluggable audio source system
     ├── base.py         AudioSource protocol, SearchResult, DownloadedClip
     ├── youtube.py      YouTube source (yt-dlp with retry/backoff)
     └── local.py        Local file source (random position extraction)
 ```
 
-Each module exposes plain Python functions. The CLI is a thin layer on top. All inter-step communication happens through the filesystem. Sources are protocol-based — implement `search()`, `download()`, and `dry_run()` to add a new one.
+Each module exposes plain Python functions. The CLI is a thin layer on top. All inter-step communication happens through the filesystem. Sources, effects, and strategies are all protocol-based — implement the interface to add a new one.
 
 ## Development
 
@@ -227,7 +235,7 @@ pip install -e .
 pytest tests/ -v
 ```
 
-101 tests covering CLI subcommands, source abstraction, local file sampling, metadata sidecars, weighted selection, download resilience, preset configuration, structured logging, UI modes, and audio processing.
+283 tests covering CLI subcommands, clip extraction, source abstraction, local file sampling, metadata sidecars, weighted selection, download resilience, presets, logging, UI modes, audio processing, effects, BPM-aware looping, pitch/time transforms, arrangement strategies, templates, stems, and analysis.
 
 ## Origins
 

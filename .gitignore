@@ -48,3 +48,24 @@ dodgylegally_output/
 
 # User config / presets
 ~/.config/dodgylegally/
+
+# Test / coverage artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Experimental / one-off scripts (not part of the library)
+confetti_*.py
+confetti_*.txt
+tornado_*.py
+muse_spoken.py
+source_spoken.py
+
+# Experimental output directories
+confetti_samples/
+confetti_compositions/
+confetti_spoken/
+confetti_whisper/
+tornado_assembled/
+tornado_spoken/
+spoken_clips/
