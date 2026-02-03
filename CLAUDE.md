@@ -14,7 +14,7 @@ Based on work by Colugo Music; public domain, no license.
 # Install (dev mode)
 pip install -e .
 
-# Run tests (283 tests)
+# Run tests (302 tests)
 pytest tests/ -v
 
 # CLI usage
@@ -57,7 +57,7 @@ src/dodgylegally/
 ├── effects/            # Pluggable audio effect system
 │   ├── __init__.py     # Effect registry, parse_chain
 │   ├── base.py         # AudioEffect protocol
-│   └── builtin.py      # reverb, lowpass, highpass, bitcrush, distortion, stutter, reverse
+│   └── builtin.py      # reverb, lowpass, highpass, bitcrush, distortion, stutter, reverse, delay
 ├── sources/            # Pluggable audio source system
 │   ├── __init__.py     # Source registry (get_source, list_sources, weighted_select)
 │   ├── base.py         # AudioSource protocol, SearchResult, DownloadedClip
@@ -133,7 +133,7 @@ Subcommands compose via piping: `dodgylegally search --count 5 | dodgylegally do
 
 ## Testing
 
-283 tests covering CLI subcommands, clip extraction, source abstraction, local file source, metadata sidecars, weighted selection, download resilience, presets, logging, UI modes, audio processing, word-centered trimming, effects, BPM looping, transforms, strategies, templates (including spoken-word-reveal), stems, and analysis.
+302 tests covering CLI subcommands, clip extraction, source abstraction, local file source, metadata sidecars, weighted selection, download resilience, presets, logging, UI modes, audio processing, word-centered trimming, effects (including delay with dry/wet mix), BPM looping, transforms, strategies, templates (including spoken-word-reveal), stems, and analysis.
 
 ```bash
 pytest tests/ -v
@@ -212,7 +212,7 @@ python compose_word_scatter.py      # ~22s word scatter
 
 - `source_skipping.py` — Three-mode clip sourcing from skipping rope videos. Downloads videos and runs chant detection (whisper word-density), percussion detection (onset-dense speech-free windows), and atmosphere extraction (steady-state energy regions) on each. Outputs to `skipping_rope_clips/{chant,percussion,atmosphere}/{short,medium,long}/`.
 - `skipping_assemble.py` — Profiles clips (BPM, onset density, energy variance, spectral centroid), scores within-category and cross-layer compatibility, assembles versioned mixes with gain staging.
-- `skipping_compose.py` — Four compositions from skipping rope clips: Playground (raw documentary, build-and-drop template), Rope Machine (100 BPM grid with stutter+bitcrush), Ghost Playground (reversed lowpassed wash with percussion reveal), Tempo Shift (80->140->80 BPM arc via time_stretch_file).
+- `skipping_compose.py` — Four compositions from skipping rope clips using multitrack infrastructure (Track, Pattern, DelayBus, mix_tracks). Playground (documentary with quarter-note delay), Rope Machine (100 BPM grid with dotted-8th delay, stutter+bitcrush), Ghost Playground (two-phase delay: sparse echoes then cascading density), Tempo Shift (80->140->80 BPM with delay times shifting per zone).
 
 ```bash
 # Source clips (test with 3 phrases per category)
@@ -277,11 +277,11 @@ skipping_rope_clips/              Three-mode extraction output
   atmosphere/{short,medium,long}/ Playground ambience clips (4s/8s/15s)
 skipping_assembled/               Scored and assembled versions
   manifest.json                   Per-version score, clips, profiling data
-skipping_compositions/            Four compositions
-  playground.wav                  Raw documentary (~30s)
-  rope_machine.wav                Mechanical 100 BPM grid (~21s)
-  ghost_playground.wav            Reversed wash + percussion reveal (~25s)
-  tempo_shift.wav                 80->140->80 BPM arc (~30s)
+skipping_compositions/            Four multitrack compositions with delay buses
+  playground.wav                  Documentary with quarter-note delay (~30s)
+  rope_machine.wav                Mechanical 100 BPM, dotted-8th delay (~21s)
+  ghost_playground.wav            Two-phase cascading delay (~25s)
+  tempo_shift.wav                 80->140->80 BPM, delay shifts per zone (~30s)
 ```
 
 See `docs/case-study-skipping-rope.md` for the full sourcing and composition story.
