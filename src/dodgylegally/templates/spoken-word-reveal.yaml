@@ -1,0 +1,21 @@
+name: spoken-word-reveal
+description: Filtered texture builds to a clear spoken-word reveal, then echoes away.
+sections:
+  - name: texture
+    strategy: loudness
+    duration_s: 6
+    kwargs:
+      descending: false
+  - name: emerge
+    strategy: loudness
+    duration_s: 5
+    kwargs:
+      descending: false
+  - name: reveal
+    strategy: sequential
+    duration_s: 4
+  - name: echo
+    strategy: loudness
+    duration_s: 5
+    kwargs:
+      descending: true

@@ -87,9 +87,11 @@ def search(ctx, count, wordlist, phrase):
 @click.option("--dry-run", is_flag=True, default=False, help="Show what would be downloaded without doing it.")
 @click.option("--source", "-s", default="youtube", help="Audio source to use (e.g. youtube, freesound, local).")
 @click.option("--clip-position", default="midpoint", help="Clip extraction position: midpoint, random, or a timestamp in seconds.")
-@click.option("--clip-duration", default=1.0, type=float, help="Clip duration in seconds (default: 1.0).")
+@click.option("--clip-duration", default=None, type=float, help="Clip duration in seconds (default: 1.0).")
+@click.option("--spoken-word", is_flag=True, default=False, help="Find the phrase in video captions and clip at that moment.")
+@click.option("--whisper-model", default="base", help="Whisper model size for spoken-word STT fallback (tiny, base, small, medium, large).")
 @click.pass_context
-def download(ctx, phrase, phrases_file, url, delay, dry_run, source, clip_position, clip_duration):
+def download(ctx, phrase, phrases_file, url, delay, dry_run, source, clip_position, clip_duration, spoken_word, whisper_model):
     """Download audio from YouTube or other sources."""
     import os
     import time as _time
@@ -97,6 +99,8 @@ def download(ctx, phrase, phrases_file, url, delay, dry_run, source, clip_positi
     from dodgylegally.clip import ClipSpec
     from dodgylegally.sources import get_source
 
+    if clip_duration is None:
+        clip_duration = 1.5 if spoken_word else 1.0
     clip_spec = ClipSpec.from_cli(clip_position, clip_duration)
 
     if not dry_run:
@@ -128,12 +132,25 @@ def download(ctx, phrase, phrases_file, url, delay, dry_run, source, clip_positi
                 _time.sleep(delay)
             console.info(f"Downloading ({audio_source.name}): {p}")
             try:
-                results = audio_source.search(p)
-                if not results:
-                    console.info(f"  no results for '{p}'")
-                    continue
-                clip = audio_source.download(results[0], Path(output_dir), delay=delay, clip_spec=clip_spec)
-                console.info(f"  saved: {clip.path}")
+                if spoken_word and audio_source.name == "youtube":
+                    sw = audio_source.search_and_download_spoken_word(
+                        p, Path(output_dir), clip_spec=clip_spec, delay=delay,
+                        whisper_model=whisper_model,
+                    )
+                    if sw.method == "caption":
+                        console.info(f"  spoken-word: found in captions at {sw.timestamp_s:.1f}s (probed {sw.candidates_probed} video(s))")
+                    elif sw.method == "whisper":
+                        console.info(f"  spoken-word: found via STT at {sw.timestamp_s:.1f}s")
+                    else:
+                        console.info(f"  spoken-word: not found (probed {sw.candidates_probed} video(s), STT failed), using fallback")
+                    console.info(f"  saved: {sw.clip.path}")
+                else:
+                    results = audio_source.search(p)
+                    if not results:
+                        console.info(f"  no results for '{p}'")
+                        continue
+                    clip = audio_source.download(results[0], Path(output_dir), delay=delay, clip_spec=clip_spec)
+                    console.info(f"  saved: {clip.path}")
             except Exception as e:
                 console.error(f"  download failed: {e}")
 
@@ -291,9 +308,11 @@ def combine(ctx, input_dir, repeats, strategy, template, stems):
 @click.option("--source", "-s", multiple=True, default=None, help="Audio source with optional weight (e.g. youtube:7, local:3). Repeatable.")
 @click.option("--repeats", "-r", default="3-4", help="Repeat range for each loop in combine step (e.g. 3-4).")
 @click.option("--clip-position", default="midpoint", help="Clip extraction position: midpoint, random, or a timestamp in seconds.")
-@click.option("--clip-duration", default=1.0, type=float, help="Clip duration in seconds (default: 1.0).")
+@click.option("--clip-duration", default=None, type=float, help="Clip duration in seconds (default: 1.0).")
+@click.option("--spoken-word", is_flag=True, default=False, help="Find the phrase in video captions and clip at that moment.")
+@click.option("--whisper-model", default="base", help="Whisper model size for spoken-word STT fallback (tiny, base, small, medium, large).")
 @click.pass_context
-def run(ctx, count, wordlist, delay, dry_run, preset, source, repeats, clip_position, clip_duration):
+def run(ctx, count, wordlist, delay, dry_run, preset, source, repeats, clip_position, clip_duration, spoken_word, whisper_model):
     """Full pipeline: search -> download -> process -> combine."""
     import os
     import time as _time
@@ -304,6 +323,8 @@ def run(ctx, count, wordlist, delay, dry_run, preset, source, repeats, clip_posi
     from dodgylegally.process import process_file as process_single
     from dodgylegally.combine import combine_loops
 
+    if clip_duration is None:
+        clip_duration = 1.5 if spoken_word else 1.0
     clip_spec = ClipSpec.from_cli(clip_position, clip_duration)
 
     # Apply preset config, CLI flags override
@@ -358,12 +379,25 @@ def run(ctx, count, wordlist, delay, dry_run, preset, source, repeats, clip_posi
         audio_source = get_source(source_name)
         console.info(f"Downloading ({source_name}): {phrase}")
         try:
-            results = audio_source.search(phrase)
-            if not results:
-                console.info(f"  no results for '{phrase}'")
-                continue
-            clip = audio_source.download(results[0], Path(raw_dir), delay=delay, clip_spec=clip_spec)
-            new_files = [str(clip.path)]
+            if spoken_word and audio_source.name == "youtube":
+                sw = audio_source.search_and_download_spoken_word(
+                    phrase, Path(raw_dir), clip_spec=clip_spec, delay=delay,
+                    whisper_model=whisper_model,
+                )
+                if sw.method == "caption":
+                    console.info(f"  spoken-word: found in captions at {sw.timestamp_s:.1f}s (probed {sw.candidates_probed} video(s))")
+                elif sw.method == "whisper":
+                    console.info(f"  spoken-word: found via STT at {sw.timestamp_s:.1f}s")
+                else:
+                    console.info(f"  spoken-word: not found (probed {sw.candidates_probed} video(s), STT failed), using fallback")
+                new_files = [str(sw.clip.path)]
+            else:
+                results = audio_source.search(phrase)
+                if not results:
+                    console.info(f"  no results for '{phrase}'")
+                    continue
+                clip = audio_source.download(results[0], Path(raw_dir), delay=delay, clip_spec=clip_spec)
+                new_files = [str(clip.path)]
         except Exception as e:
             console.error(f"  download failed: {e}")
             continue

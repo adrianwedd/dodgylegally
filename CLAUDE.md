@@ -14,7 +14,7 @@ Based on work by Colugo Music; public domain, no license.
 # Install (dev mode)
 pip install -e .
 
-# Run tests (222 tests)
+# Run tests (283 tests)
 pytest tests/ -v
 
 # CLI usage
@@ -63,11 +63,17 @@ src/dodgylegally/
 │   ├── base.py         # AudioSource protocol, SearchResult, DownloadedClip
 │   ├── youtube.py      # YouTubeSource — yt-dlp with retry and backoff
 │   └── local.py        # LocalSource — sample from local audio files
+├── templates/          # Bundled YAML arrangement templates
+│   ├── ambient-drift.yaml
+│   ├── build-and-drop.yaml
+│   ├── chaos.yaml
+│   ├── rhythmic-collage.yaml
+│   └── spoken-word-reveal.yaml
 └── strategies/         # Arrangement and composition strategies
     ├── __init__.py     # Strategy registry
     ├── base.py         # ArrangementStrategy protocol
     ├── builtin.py      # sequential, loudness, tempo, key_compatible, layered
-    └── templates.py    # YAML arrangement templates (build-and-drop, ambient-drift)
+    └── templates.py    # YAML arrangement templates (load, apply, distribute)
 ```
 
 **Pipeline:** search → download → process → combine
@@ -83,6 +89,8 @@ Each module exposes plain Python functions. The CLI is a thin arg-parsing layer.
 - **Preset system** — YAML presets in bundled dir or `~/.config/dodgylegally/presets/`. CLI flags override.
 - **Mutually exclusive options** — `--verbose` and `--quiet` enforced via custom `_MutuallyExclusiveOption`.
 - **Configurable clip extraction** — `ClipSpec` dataclass controls position (midpoint/random/timestamp) and duration; shared by all sources and the legacy download module.
+- **Word-centered trimming** — `trim_word_centered()` centers a clip on a spoken word using whisper/caption timestamps, with zero-crossing edge snapping and micro-fades.
+- **Arrangement templates** — YAML-defined section-based compositions. Five bundled: `build-and-drop`, `ambient-drift`, `chaos`, `rhythmic-collage`, `spoken-word-reveal`.
 
 ### Subcommands
 
@@ -119,11 +127,13 @@ Subcommands compose via piping: `dodgylegally search --count 5 | dodgylegally do
 - `pydub` — audio processing
 - `pyyaml` — preset configuration
 - `yt-dlp` — YouTube downloading
+- `librosa` + `soundfile` — pitch/time transforms, audio analysis
+- `faster-whisper` — spoken-word clip verification and word-level timestamps (assembly scripts)
 - FFmpeg — runtime requirement for audio conversion
 
 ## Testing
 
-222 tests across 22 test files covering CLI subcommands, clip extraction, source abstraction, local file source, metadata sidecars, weighted selection, download resilience, presets, logging, UI modes, audio processing, effects, BPM looping, transforms, strategies, templates, stems, and analysis.
+283 tests covering CLI subcommands, clip extraction, source abstraction, local file source, metadata sidecars, weighted selection, download resilience, presets, logging, UI modes, audio processing, word-centered trimming, effects, BPM looping, transforms, strategies, templates (including spoken-word-reveal), stems, and analysis.
 
 ```bash
 pytest tests/ -v
@@ -136,6 +146,98 @@ All 4 phases complete. Design docs in `docs/plans/`:
 - **Phase 2** (complete): Source Diversity — source abstraction, local files, metadata, weighted runs
 - **Phase 3** (complete): Audio Creativity — analysis, effects, BPM-aware looping, pitch/time transforms
 - **Phase 4** (complete): Composition Intelligence — arrangement strategies, templates, stem export
+
+## Standalone Scripts
+
+Scripts in the repo root for spoken-word clip sourcing and phrase assembly:
+
+### Clip sourcing
+
+- `source_spoken.py` — **Unified** spoken-word sourcing script. Uses library's `transcribe_and_find()` + `trim_word_centered()` for precise centering, post-trim whisper verification, and quality gates. Outputs to `spoken_clips/<target>/tight|long/`. Replaces the per-word scripts below for new sourcing runs.
+- `confetti_spoken.py` — Legacy: downloads clips where "confetti" is spoken. No midpoint fallback.
+- `tornado_spoken.py` — Legacy: downloads clips for "tornado", "full of", and "tornado full of".
+- `confetti_batch.py` / `confetti_sounds.py` — Earlier batch download scripts (less selective).
+
+```bash
+# Source "full of" clips (the gap)
+python source_spoken.py --target "full of"
+
+# Source with custom whisper model
+python source_spoken.py --target "confetti" --whisper-model small
+
+# Verify existing clips without downloading
+python source_spoken.py --target "full of" --verify-only
+
+# Limit to first 10 phrases
+python source_spoken.py --target "tornado" --count 10
+```
+
+### Phrase assembly
+
+- `tornado_assemble.py` — Assembles "tornado full of confetti" from spoken-word clips. Whisper-verifies every clip, scores combinations for spectral/level compatibility, splices with zero-crossing edges and crossfades.
+
+```bash
+# Scan clip inventory without assembling
+python tornado_assemble.py --verify-only
+
+# Assemble 15 versions
+python tornado_assemble.py --versions 15
+
+# Tune assembly parameters
+python tornado_assemble.py --gap-ms 80 --crossfade-ms 30 --target-dbfs -16
+```
+
+Key functions (reusable outside the script):
+- `verify_clip(path, target_word, model)` → `VerifiedClip | None` — whisper-confirms a word is present
+- `verify_directory(dir, word, model)` → verified + rejected lists
+- `extract_word(clip)` → `AudioSegment` trimmed to whisper boundaries
+- `score_sequence(clips)` → float compatibility score
+- `assemble_phrase(clips)` → `AudioSegment` with level-matched, crossfaded words
+
+### Composition
+
+- `confetti_compose.py` — Template-based compositions from confetti sample collections (cascade, wash, machine, reveal). Uses the library's template, effect, and stem systems.
+- `compose_spectral_morph.py` — Sorts assembled "tornado full of confetti" versions by spectral centroid and crossfades between them. Warm-to-bright timbral shift.
+- `compose_reverse_reveal.py` — Reversed wash of assembled versions with forward versions emerging at the midpoint. Dense lowpassed texture yields to clean speech.
+- `compose_word_scatter.py` — Extracts individual words from assembled versions and scatters them on a rhythmic grid at 90 BPM with jitter and pitch variation.
+
+```bash
+# Run compositions (output to tornado_compositions/)
+python compose_spectral_morph.py    # ~20s spectral morph
+python compose_reverse_reveal.py    # ~20s reverse reveal
+python compose_word_scatter.py      # ~22s word scatter
+```
+
+### Sample collections
+
+```
+confetti_whisper/tight/   48 × 1.0s clips (6 whisper-centered, 42 midpoint)
+confetti_whisper/long/    48 × 4.0s clips (6 whisper-centered, 42 midpoint)
+confetti_spoken/tight/    29 × 1.0s clips (16 whisper-verified "confetti")
+confetti_spoken/long/     29 × 4.0s clips
+tornado_spoken/tornado/   15 × 1.0s + 15 × 4.0s (11 verified "tornado")
+tornado_spoken/full of/    6 × 1.0s +  6 × 4.0s (1 verified "full of")
+tornado_spoken/tornado full of/  7 × 1.0s + 7 × 4.0s (0 verified "full of")
+spoken_clips/             Word-centered clips from source_spoken.py (verified)
+  tornado/                64 verified clips (super_tight 50ms/80ms/120ms + tight)
+  full of/                25 verified clips (expanded from 12 via targeted phrases)
+  confetti/               68 verified clips (super_tight 50ms/80ms/120ms + tight)
+```
+
+### Assembled output
+
+```
+tornado_assembled_supertight_v2/  20 assembled "tornado full of confetti" versions
+  manifest.json                   Clip provenance, scores, spectral data
+  v01_score2.8.wav ... v20_score19.4.wav  Scored and ranked assemblies
+tornado_compositions/             Compositions built from assembled versions
+  cascade_canon.wav               16-voice accelerando canon (21.3s)
+  spectral_morph.wav              Warm-to-bright spectral crossfade (20.1s)
+  reverse_reveal.wav              Reversed wash → forward emergence (20.0s)
+  word_scatter.wav                Rhythmic word grid at 90 BPM (22.3s)
+```
+
+**"full of" gap (resolved):** Legacy scripts yielded 1 verified clip. `source_spoken.py` with targeted search phrases (idiom explainers, grammar lessons, deliberate emphasis) expanded the pool to 25 verified clips. See `docs/case-study-super-tight.md` for the full story.
 
 ## Legacy
 

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pydub import AudioSegment
 from pydub.generators import Sine
 
 
@@ -96,6 +97,36 @@ def test_apply_template_with_few_files(tmp_path):
 
     result = apply_template(template, str(loop_dir), str(out))
     assert Path(result).exists()
+
+
+def test_spoken_word_reveal_template_loads():
+    """spoken-word-reveal template loads with 4 sections."""
+    from dodgylegally.strategies.templates import load_template
+
+    template = load_template("spoken-word-reveal")
+    assert template["name"] == "spoken-word-reveal"
+    assert len(template["sections"]) == 4
+    names = [s["name"] for s in template["sections"]]
+    assert names == ["texture", "emerge", "reveal", "echo"]
+
+
+def test_spoken_word_reveal_template_applies(tmp_path):
+    """apply_template with spoken-word-reveal produces output."""
+    from dodgylegally.strategies.templates import load_template, apply_template
+
+    loop_dir = tmp_path / "loops"
+    loop_dir.mkdir()
+    for i, name in enumerate(["a.wav", "b.wav", "c.wav", "d.wav", "e.wav"]):
+        _make_wav_with_analysis(loop_dir / name, freq=200 + i * 80, lufs=-18 + i * 2)
+
+    template = load_template("spoken-word-reveal")
+    out = tmp_path / "reveal.wav"
+
+    result = apply_template(template, str(loop_dir), str(out))
+    assert Path(result).exists()
+    seg = AudioSegment.from_file(result, format="wav")
+    # Total template duration: 6 + 5 + 4 + 5 = 20s
+    assert len(seg) >= 15000  # allow some margin
 
 
 def test_cli_combine_accepts_template_flag():

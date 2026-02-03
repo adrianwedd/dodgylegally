@@ -55,9 +55,11 @@ htmlcov/
 .pytest_cache/
 
 # Experimental / one-off scripts (not part of the library)
-confetti_*.py
+confetti_batch.py
+confetti_sounds.py
+confetti_spoken.py
 confetti_*.txt
-tornado_*.py
+tornado_spoken.py
 muse_spoken.py
 source_spoken.py
 
@@ -67,5 +69,8 @@ confetti_compositions/
 confetti_spoken/
 confetti_whisper/
 tornado_assembled/
+tornado_assembled_supertight/
+tornado_assembled_supertight_v2/
+tornado_compositions/
 tornado_spoken/
 spoken_clips/

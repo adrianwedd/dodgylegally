@@ -148,3 +148,213 @@ def test_run_passes_repeats_to_combine(tmp_path):
         # repeats should be (5, 6), not the default (3, 4)
         assert call_kwargs[1].get("repeats") == (5, 6) or \
                (len(call_kwargs[0]) > 2 and call_kwargs[0][2] == (5, 6))
+
+
+def test_download_accepts_spoken_word_flag():
+    """CLI download subcommand accepts --spoken-word flag."""
+    runner = CliRunner()
+    result = runner.invoke(cli, ["download", "--spoken-word", "--dry-run", "--phrase", "confetti"])
+    assert result.exit_code == 0
+
+
+def test_run_accepts_spoken_word_flag(tmp_path):
+    """run subcommand accepts --spoken-word flag."""
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "-o", str(tmp_path),
+        "run", "--count", "1", "--dry-run", "--spoken-word",
+    ])
+    assert result.exit_code == 0
+
+
+def test_spoken_word_defaults_clip_duration_to_1_5():
+    """--spoken-word without --clip-duration defaults to 1.5s."""
+    from unittest.mock import patch, MagicMock
+
+    runner = CliRunner()
+    with patch("dodgylegally.sources.get_source") as mock_get_source, \
+         patch("dodgylegally.cli._check_ffmpeg"):
+        mock_source = MagicMock()
+        mock_source.name = "youtube"
+        mock_sw = MagicMock()
+        mock_sw.method = "caption"
+        mock_sw.caption_found = True
+        mock_sw.timestamp_s = 5.0
+        mock_sw.candidates_probed = 1
+        mock_sw.clip.path = "/tmp/fake.wav"
+        mock_source.search_and_download_spoken_word.return_value = mock_sw
+        mock_get_source.return_value = mock_source
+
+        result = runner.invoke(cli, [
+            "download", "--spoken-word", "--phrase", "confetti",
+        ])
+        assert result.exit_code == 0
+        call_kwargs = mock_source.search_and_download_spoken_word.call_args
+        assert call_kwargs[1]["clip_spec"].duration_s == 1.5
+
+
+def test_spoken_word_explicit_clip_duration_overrides():
+    """--clip-duration overrides the spoken-word default of 1.5s."""
+    from unittest.mock import patch, MagicMock
+
+    runner = CliRunner()
+    with patch("dodgylegally.sources.get_source") as mock_get_source, \
+         patch("dodgylegally.cli._check_ffmpeg"):
+        mock_source = MagicMock()
+        mock_source.name = "youtube"
+        mock_sw = MagicMock()
+        mock_sw.method = "fallback"
+        mock_sw.caption_found = False
+        mock_sw.candidates_probed = 5
+        mock_sw.clip.path = "/tmp/fake.wav"
+        mock_source.search_and_download_spoken_word.return_value = mock_sw
+        mock_get_source.return_value = mock_source
+
+        result = runner.invoke(cli, [
+            "download", "--spoken-word", "--clip-duration", "3.0", "--phrase", "confetti",
+        ])
+        assert result.exit_code == 0
+        call_kwargs = mock_source.search_and_download_spoken_word.call_args
+        assert call_kwargs[1]["clip_spec"].duration_s == 3.0
+
+
+def test_no_spoken_word_defaults_clip_duration_to_1():
+    """Without --spoken-word, --clip-duration defaults to 1.0s."""
+    from unittest.mock import patch, MagicMock
+
+    runner = CliRunner()
+    with patch("dodgylegally.sources.get_source") as mock_get_source, \
+         patch("dodgylegally.cli._check_ffmpeg"):
+        mock_source = MagicMock()
+        mock_source.name = "youtube"
+        mock_source.search.return_value = [MagicMock()]
+        mock_clip = MagicMock()
+        mock_clip.path = "/tmp/fake.wav"
+        mock_source.download.return_value = mock_clip
+        mock_get_source.return_value = mock_source
+
+        result = runner.invoke(cli, [
+            "download", "--phrase", "confetti",
+        ])
+        assert result.exit_code == 0
+        call_kwargs = mock_source.download.call_args
+        assert call_kwargs[1]["clip_spec"].duration_s == 1.0
+
+
+def test_spoken_word_shows_caption_found_message():
+    """--spoken-word prints match status when caption is found."""
+    from unittest.mock import patch, MagicMock
+
+    runner = CliRunner()
+    with patch("dodgylegally.sources.get_source") as mock_get_source, \
+         patch("dodgylegally.cli._check_ffmpeg"):
+        mock_source = MagicMock()
+        mock_source.name = "youtube"
+        mock_sw = MagicMock()
+        mock_sw.method = "caption"
+        mock_sw.caption_found = True
+        mock_sw.timestamp_s = 12.5
+        mock_sw.candidates_probed = 2
+        mock_sw.clip.path = "/tmp/fake.wav"
+        mock_source.search_and_download_spoken_word.return_value = mock_sw
+        mock_get_source.return_value = mock_source
+
+        result = runner.invoke(cli, [
+            "download", "--spoken-word", "--phrase", "confetti",
+        ])
+        assert result.exit_code == 0
+        assert "spoken-word: found in captions at 12.5s (probed 2 video(s))" in result.output
+
+
+def test_spoken_word_shows_whisper_found_message():
+    """--spoken-word prints STT status when Whisper finds the word."""
+    from unittest.mock import patch, MagicMock
+
+    runner = CliRunner()
+    with patch("dodgylegally.sources.get_source") as mock_get_source, \
+         patch("dodgylegally.cli._check_ffmpeg"):
+        mock_source = MagicMock()
+        mock_source.name = "youtube"
+        mock_sw = MagicMock()
+        mock_sw.method = "whisper"
+        mock_sw.caption_found = False
+        mock_sw.timestamp_s = 8.3
+        mock_sw.candidates_probed = 5
+        mock_sw.clip.path = "/tmp/fake.wav"
+        mock_source.search_and_download_spoken_word.return_value = mock_sw
+        mock_get_source.return_value = mock_source
+
+        result = runner.invoke(cli, [
+            "download", "--spoken-word", "--phrase", "confetti",
+        ])
+        assert result.exit_code == 0
+        assert "spoken-word: found via STT at 8.3s" in result.output
+
+
+def test_spoken_word_shows_fallback_message():
+    """--spoken-word prints fallback status when both captions and STT fail."""
+    from unittest.mock import patch, MagicMock
+
+    runner = CliRunner()
+    with patch("dodgylegally.sources.get_source") as mock_get_source, \
+         patch("dodgylegally.cli._check_ffmpeg"):
+        mock_source = MagicMock()
+        mock_source.name = "youtube"
+        mock_sw = MagicMock()
+        mock_sw.method = "fallback"
+        mock_sw.caption_found = False
+        mock_sw.candidates_probed = 5
+        mock_sw.clip.path = "/tmp/fake.wav"
+        mock_source.search_and_download_spoken_word.return_value = mock_sw
+        mock_get_source.return_value = mock_source
+
+        result = runner.invoke(cli, [
+            "download", "--spoken-word", "--phrase", "confetti",
+        ])
+        assert result.exit_code == 0
+        assert "spoken-word: not found (probed 5 video(s), STT failed), using fallback" in result.output
+
+
+def test_download_accepts_whisper_model_flag():
+    """CLI download subcommand accepts --whisper-model flag."""
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "download", "--whisper-model", "tiny", "--dry-run", "--phrase", "test",
+    ])
+    assert result.exit_code == 0
+
+
+def test_run_accepts_whisper_model_flag(tmp_path):
+    """run subcommand accepts --whisper-model flag."""
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "-o", str(tmp_path),
+        "run", "--count", "1", "--dry-run", "--whisper-model", "small",
+    ])
+    assert result.exit_code == 0
+
+
+def test_whisper_model_passed_to_spoken_word():
+    """--whisper-model is passed through to search_and_download_spoken_word."""
+    from unittest.mock import patch, MagicMock
+
+    runner = CliRunner()
+    with patch("dodgylegally.sources.get_source") as mock_get_source, \
+         patch("dodgylegally.cli._check_ffmpeg"):
+        mock_source = MagicMock()
+        mock_source.name = "youtube"
+        mock_sw = MagicMock()
+        mock_sw.method = "fallback"
+        mock_sw.caption_found = False
+        mock_sw.candidates_probed = 5
+        mock_sw.clip.path = "/tmp/fake.wav"
+        mock_source.search_and_download_spoken_word.return_value = mock_sw
+        mock_get_source.return_value = mock_source
+
+        result = runner.invoke(cli, [
+            "download", "--spoken-word", "--whisper-model", "tiny",
+            "--phrase", "confetti",
+        ])
+        assert result.exit_code == 0
+        call_kwargs = mock_source.search_and_download_spoken_word.call_args
+        assert call_kwargs[1]["whisper_model"] == "tiny"

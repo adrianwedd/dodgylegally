@@ -189,10 +189,11 @@ All output is standard WAV. Each clip has a `.json` sidecar tracking its source,
 
 ## Case studies
 
-Two documented experiments exploring different approaches:
+Three documented experiments exploring different approaches:
 
 - **[Making a Beat from Nothing](docs/case-study-making-a-beat-from-nothing.md)** — Random phrases, 14% hit rate, a 14-second piece from 4 surviving clips. The chaos approach.
 - **[The Sound of Confetti](docs/case-study-confetti-tornado.md)** — Themed collection around "tornado full of confetti." 32 clips composed into a 36-second structured piece with an intro/build/peak/outro arc. Documents YouTube rate limiting and mitigation strategies.
+- **[Super-Tight Word Isolation](docs/case-study-super-tight.md)** — Isolating spoken words from neighbouring speech bleed using whisper-detected word boundaries. 114 super-tight clips, a compatibility scorer, 20 assembled versions of "tornado full of confetti," and a composition suite exploring spectral morphing, reverse reveals, and rhythmic word scattering.
 
 ## Architecture
 
@@ -210,6 +211,7 @@ src/dodgylegally/
 ├── looping.py          BPM-aware loop creation, beat alignment
 ├── transform.py        Pitch shifting, time stretching
 ├── stems.py            Multi-track stem export
+├── transcript.py       YouTube caption fetching, whisper transcription
 ├── ui.py               Console output (quiet/verbose modes)
 ├── logging_config.py   Structured logging configuration
 ├── wordlist.txt        Bundled 5,000-word dictionary
