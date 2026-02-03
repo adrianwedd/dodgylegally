@@ -62,6 +62,7 @@ def _default_param(effect_name: str, value: str) -> dict:
         "bitcrush": "bits",
         "distortion": "gain",
         "stutter": "slice_ms",
+        "delay": "delay_ms",
     }
     key = _param_map.get(effect_name, "value")
     try:
@@ -78,6 +79,7 @@ from dodgylegally.effects.builtin import (  # noqa: E402
     BitcrushEffect,
     DistortionEffect,
     StutterEffect,
+    DelayEffect,
 )
 
 register_effect("reverse", ReverseEffect)
@@ -86,3 +88,4 @@ register_effect("highpass", HighpassEffect)
 register_effect("bitcrush", BitcrushEffect)
 register_effect("distortion", DistortionEffect)
 register_effect("stutter", StutterEffect)
+register_effect("delay", DelayEffect)

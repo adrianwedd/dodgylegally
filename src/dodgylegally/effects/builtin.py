@@ -106,3 +106,62 @@ class StutterEffect:
         for p in pieces[1:]:
             result = result + p
         return result
+
+
+class DelayEffect:
+    """Echo/delay with geometric feedback decay.
+
+    Each repeat is attenuated by feedback**i. Output length extends by
+    delay_ms * repeats when mix > 0. mix=0 returns dry (original length),
+    mix=1.0 returns wet-only with tail.
+    """
+
+    @property
+    def name(self) -> str:
+        return "delay"
+
+    def apply(self, audio: AudioSegment, params: dict) -> AudioSegment:
+        delay_ms = int(params.get("delay_ms", 250))
+        feedback = float(params.get("feedback", 0.4))
+        repeats = int(params.get("repeats", 3))
+        mix = float(params.get("mix", 0.5))
+
+        feedback = max(0.0, min(feedback, 0.95))
+        repeats = max(0, min(repeats, 20))
+        mix = max(0.0, min(mix, 1.0))
+
+        if repeats == 0:
+            return audio
+
+        tail_ms = delay_ms * repeats
+        wet = AudioSegment.silent(
+            duration=len(audio) + tail_ms,
+            frame_rate=audio.frame_rate,
+        )
+        # Ensure matching channels/sample_width
+        wet = wet.set_channels(audio.channels).set_sample_width(audio.sample_width)
+
+        for i in range(1, repeats + 1):
+            gain = feedback ** i
+            if gain < 0.001:
+                break
+            offset = delay_ms * i
+            tap = audio.apply_gain(20 * np.log10(gain)) if gain > 0 else audio
+            wet = wet.overlay(tap, position=offset)
+
+        if mix <= 0.0:
+            return audio
+
+        if mix >= 1.0:
+            return wet
+
+        # Crossfade: attenuate dry by (1-mix), wet by mix
+        dry = audio + AudioSegment.silent(
+            duration=tail_ms,
+            frame_rate=audio.frame_rate,
+        ).set_channels(audio.channels).set_sample_width(audio.sample_width)
+
+        dry_gain = 20 * np.log10(1.0 - mix)
+        wet_gain = 20 * np.log10(mix)
+
+        return dry.apply_gain(dry_gain).overlay(wet.apply_gain(wet_gain))
