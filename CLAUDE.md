@@ -208,6 +208,39 @@ python compose_reverse_reveal.py    # ~20s reverse reveal
 python compose_word_scatter.py      # ~22s word scatter
 ```
 
+### Skipping rope
+
+- `source_skipping.py` — Three-mode clip sourcing from skipping rope videos. Downloads videos and runs chant detection (whisper word-density), percussion detection (onset-dense speech-free windows), and atmosphere extraction (steady-state energy regions) on each. Outputs to `skipping_rope_clips/{chant,percussion,atmosphere}/{short,medium,long}/`.
+- `skipping_assemble.py` — Profiles clips (BPM, onset density, energy variance, spectral centroid), scores within-category and cross-layer compatibility, assembles versioned mixes with gain staging.
+- `skipping_compose.py` — Four compositions from skipping rope clips: Playground (raw documentary, build-and-drop template), Rope Machine (100 BPM grid with stutter+bitcrush), Ghost Playground (reversed lowpassed wash with percussion reveal), Tempo Shift (80->140->80 BPM arc via time_stretch_file).
+
+```bash
+# Source clips (test with 3 phrases per category)
+python source_skipping.py --category all --count 3
+
+# Source only percussion clips
+python source_skipping.py --category percussion
+
+# Verify existing clip inventory
+python source_skipping.py --verify-only
+
+# Assemble 10 versions
+python skipping_assemble.py --versions 10
+
+# Profile clips without assembling
+python skipping_assemble.py --verify-only
+
+# Run all four compositions
+python skipping_compose.py
+```
+
+Key functions (reusable outside the scripts):
+- `extract_chant_regions(audio, word_timestamps)` -> list of (start, end, word_density)
+- `extract_percussion_windows(audio_path, word_timestamps)` -> list of (start, end, onset_count)
+- `extract_ambient_region(audio_path)` -> (start, end) or None
+- `score_cross_layer(chant, perc, atmo)` -> float compatibility score
+- `assemble_full_mix(chant, perc, atmo)` -> AudioSegment with gain staging
+
 ### Sample collections
 
 ```
@@ -236,6 +269,22 @@ tornado_compositions/             Compositions built from assembled versions
   reverse_reveal.wav              Reversed wash → forward emergence (20.0s)
   word_scatter.wav                Rhythmic word grid at 90 BPM (22.3s)
 ```
+
+```
+skipping_rope_clips/              Three-mode extraction output
+  chant/{short,medium,long}/      Rhythmic chanting clips (2s/4s/8s)
+  percussion/{short,medium,long}/ Percussive rope/feet clips (0.5s/1s/2s)
+  atmosphere/{short,medium,long}/ Playground ambience clips (4s/8s/15s)
+skipping_assembled/               Scored and assembled versions
+  manifest.json                   Per-version score, clips, profiling data
+skipping_compositions/            Four compositions
+  playground.wav                  Raw documentary (~30s)
+  rope_machine.wav                Mechanical 100 BPM grid (~21s)
+  ghost_playground.wav            Reversed wash + percussion reveal (~25s)
+  tempo_shift.wav                 80->140->80 BPM arc (~30s)
+```
+
+See `docs/case-study-skipping-rope.md` for the full sourcing and composition story.
 
 **"full of" gap (resolved):** Legacy scripts yielded 1 verified clip. `source_spoken.py` with targeted search phrases (idiom explainers, grammar lessons, deliberate emphasis) expanded the pool to 25 verified clips. See `docs/case-study-super-tight.md` for the full story.
 

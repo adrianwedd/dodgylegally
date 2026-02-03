@@ -62,6 +62,9 @@ confetti_*.txt
 tornado_spoken.py
 muse_spoken.py
 source_spoken.py
+source_skipping.py
+skipping_assemble.py
+skipping_compose.py
 
 # Experimental output directories
 confetti_samples/
@@ -74,3 +77,6 @@ tornado_assembled_supertight_v2/
 tornado_compositions/
 tornado_spoken/
 spoken_clips/
+skipping_rope_clips/
+skipping_assembled/
+skipping_compositions/
