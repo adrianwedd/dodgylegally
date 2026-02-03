@@ -212,7 +212,7 @@ python compose_word_scatter.py      # ~22s word scatter
 
 - `source_skipping.py` — Three-mode clip sourcing from skipping rope videos. Downloads videos and runs chant detection (whisper word-density), percussion detection (onset-dense speech-free windows), and atmosphere extraction (steady-state energy regions) on each. Outputs to `skipping_rope_clips/{chant,percussion,atmosphere}/{short,medium,long}/`.
 - `skipping_assemble.py` — Profiles clips (BPM, onset density, energy variance, spectral centroid), scores within-category and cross-layer compatibility, assembles versioned mixes with gain staging.
-- `skipping_compose.py` — Four compositions from skipping rope clips using multitrack infrastructure (Track, Pattern, DelayBus, mix_tracks). Playground (documentary with quarter-note delay), Rope Machine (100 BPM grid with dotted-8th delay, stutter+bitcrush), Ghost Playground (two-phase delay: sparse echoes then cascading density), Tempo Shift (80->140->80 BPM with delay times shifting per zone).
+- `skipping_compose.py` — Five compositions from skipping rope clips using multitrack infrastructure (Track, Pattern, DelayBus, mix_tracks). Playground (documentary with quarter-note delay), Rope Machine (100 BPM grid with dotted-8th delay, stutter+bitcrush), Ghost Playground (two-phase delay: sparse echoes then cascading density), Tempo Shift (80->140->80 BPM with delay times shifting per zone), Rope Work (120 BPM found-sound groove, dry pulse, uneven hat probability, subtle 16th-triplet delay).
 
 ```bash
 # Source clips (test with 3 phrases per category)
@@ -230,7 +230,7 @@ python skipping_assemble.py --versions 10
 # Profile clips without assembling
 python skipping_assemble.py --verify-only
 
-# Run all four compositions
+# Run all five compositions
 python skipping_compose.py
 ```
 
@@ -277,11 +277,12 @@ skipping_rope_clips/              Three-mode extraction output
   atmosphere/{short,medium,long}/ Playground ambience clips (4s/8s/15s)
 skipping_assembled/               Scored and assembled versions
   manifest.json                   Per-version score, clips, profiling data
-skipping_compositions/            Four multitrack compositions with delay buses
+skipping_compositions/            Five multitrack compositions with delay buses
   playground.wav                  Documentary with quarter-note delay (~30s)
   rope_machine.wav                Mechanical 100 BPM, dotted-8th delay (~21s)
   ghost_playground.wav            Two-phase cascading delay (~25s)
   tempo_shift.wav                 80->140->80 BPM, delay shifts per zone (~30s)
+  rope_work.wav                   Found-sound groove, 120 BPM (~32s)
 ```
 
 See `docs/case-study-skipping-rope.md` for the full sourcing and composition story.
